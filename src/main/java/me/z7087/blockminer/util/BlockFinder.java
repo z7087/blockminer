@@ -96,7 +96,7 @@ public final class BlockFinder {
                 findPowerBlockForPistonInternal(deduplicationMap, world, powerBlockPos, pistonPos, pistonHeadPos, isRedstoneTorch, isLever, pistonFace);
             }
         }
-        possiblePistonPowerInfos.addAll(deduplicationMap.keySet());
+        possiblePistonPowerInfos.addAll(deduplicationMap.values());
     }
 
     private static void findPowerBlockForPistonInternal(Map<PistonPowerInfo, PistonPowerInfo> deduplicationMap, World world, BlockPos powerBlockPos, BlockPos pistonPos, BlockPos pistonHeadPos, boolean isRedstoneTorch, boolean isLever, Direction pistonFace) {
@@ -246,7 +246,6 @@ public final class BlockFinder {
                     if (mergedType != oldType) {
                         pistonPowerInfo = PistonPowerInfo.of(pistonPos, pistonFace,
                                 powerBlockPos, dependDirection.getOpposite(), mergedType);
-                        deduplicationMap.remove(pistonPowerInfo); // TODO 这一行不能删掉，但为什么呢？
                         deduplicationMap.put(pistonPowerInfo, pistonPowerInfo);
                     }
                 } else {
