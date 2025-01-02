@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "blockminer",
+  "version": "${version}",
+  "name": "blockminer",
+  "description": "",
+  "authors": [],
+  "contact": {},
+  "license": "All-Rights-Reserved",
+  "icon": "assets/blockminer/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "client": [
+      "me.z7087.blockminer.BlockMinerMod"
+    ],
+    "main": [
+    ]
+  },
+  "mixins": [
+    "blockminer.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "minecraft": "${minecraft_version}"
+  }
+}
