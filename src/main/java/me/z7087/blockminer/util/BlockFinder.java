@@ -210,6 +210,10 @@ public final class BlockFinder {
             if (isLever) {
                 check:
                 {
+                    // 如果拉杆更新不到活塞，不能放置
+                    if (BlockUtils.getDistance(pistonPos, powerBlockPos) > 1
+                            && BlockUtils.getDistance(pistonPos, dependBlockPos) > 1)
+                        break check;
                     // 如果拉杆所附着的方块是完整固体方块，且固体方块旁边有附着在上面的红石火把或活塞，不能放置
                     if (dependBlockState.isSolidBlock(world, dependBlockPos)
                             && dependBlockState.isFullCube(world, dependBlockPos)) {
