@@ -381,7 +381,7 @@ public class Task implements Comparable<Task> {
                         BlockMinerMod.INSTANCE.rotationUtils.updateLocation(player);
                         // 等待活塞进入正在展开状态，不需要完全展开
                         state = TaskState.WaitForPistonExtend;
-                        setWaitTicks(blockBreakingDelta >= 1 ? 1 : (int) Math.ceil(0.7 / blockBreakingDelta));
+                        setWaitTicks(blockBreakingDelta >= 0.7 ? 1 : (int) Math.ceil(0.7 / blockBreakingDelta) + 1);
                         break loop;
                     }
                     case WaitForPistonExtend: {
@@ -454,10 +454,9 @@ public class Task implements Comparable<Task> {
                             if (!world.getBlockState(pistonPowerInfo.pistonPos).isAir())
                                 world.setBlockState(pistonPowerInfo.pistonPos, Blocks.AIR.getDefaultState());
                             // 不知道这里什么情况 为什么会报错
-                            // 希望没有什么奇怪的错误
                             //assertTrue(world.getBlockState(pistonPowerInfo.pistonPos).isAir());
                         } else {
-                            if (InventoryUtils.calcBlockBreakingDelta(player, Blocks.PISTON.getDefaultState(), player.getMainHandStack()) <= 0) {
+                            if (world.getBlockState(pistonPowerInfo.pistonPos).getBlock().getHardness() < 0) {
                                 // 怎么回事？byd活塞变基岩了？
                                 state = TaskState.Start;
                                 if (isMining) {
