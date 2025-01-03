@@ -8,11 +8,13 @@ import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.HitResult;
+import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(MinecraftClient.class)
@@ -27,6 +29,8 @@ public abstract class MixinMinecraftClient {
             return;
         if (BlockMinerMod.INSTANCE.taskManager.handleAttackBlock(((BlockHitResult) crosshairTarget).getBlockPos()))
             cir.setReturnValue(true);
+        if (BlockMinerMod.INSTANCE.blockBreakUtils.isModBreakingBlock())
+            cir.setReturnValue(true);
     }
 
     @Redirect(method = "doItemUse", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/network/ClientPlayerInteractionManager;interactBlock(Lnet/minecraft/client/network/ClientPlayerEntity;Lnet/minecraft/util/Hand;Lnet/minecraft/util/hit/BlockHitResult;)Lnet/minecraft/util/ActionResult;"))
@@ -34,5 +38,12 @@ public abstract class MixinMinecraftClient {
         if (hand == Hand.MAIN_HAND && player.getMainHandStack().isEmpty() && BlockMinerMod.INSTANCE.taskManager.handleUseOnBlock(hitResult.getBlockPos()))
             return ActionResult.FAIL;
         return interactionManager.interactBlock(player, hand, hitResult);
+    }
+
+    @Inject(method = "handleBlockBreaking", at = @At(value = "FIELD", target = "Lnet/minecraft/client/MinecraftClient;attackCooldown:I", opcode = Opcodes.PUTFIELD), cancellable = true)
+    private void beforeBlockBreaking(CallbackInfo ci) {
+        if (BlockMinerMod.INSTANCE.blockBreakUtils.isModBreakingBlock()) {
+            ci.cancel();
+        }
     }
 }

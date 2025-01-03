@@ -16,7 +16,7 @@ import java.util.Map;
 public final class BlockFinder {
     private BlockFinder() {}
 
-    private static final Direction[] DIRECTIONS = Direction.values();
+    public static final Direction[] DIRECTIONS = Direction.values();
     private static final Direction[][] POSSIBLE_FACE_DIRECTIONS;
     static {
         Direction[] directions = Direction.values();
@@ -76,6 +76,7 @@ public final class BlockFinder {
         return true;
     }
 
+    // 这个方法比较耗时，建议缓存结果
     public static void findPowerBlockForPiston(World world,
                                                BlockPos targetPos,
                                                PowerBlockType powerBlockUsage,
@@ -84,22 +85,24 @@ public final class BlockFinder {
     ) {
         final boolean isRedstoneTorch = powerBlockUsage.isRedstoneTorch();
         final boolean isLever = powerBlockUsage.isLever();
-        final LinkedHashMap<PistonPowerInfo, PistonPowerInfo> deduplicationMap = new LinkedHashMap<>();
+        final LinkedHashMap<PistonPowerInfo, PistonPowerInfo> deduplicationMapSolidDependBlock = new LinkedHashMap<>();
+        final LinkedHashMap<PistonPowerInfo, PistonPowerInfo> deduplicationMapReplaceableDependBlock = new LinkedHashMap<>();
         for (Pair<BlockPos, Direction> location : possiblePistonLocations) {
             BlockPos pistonPos = location.first;
             Direction pistonFace = location.second;
             BlockPos pistonHeadPos = pistonPos.offset(pistonFace);
             for (Direction direction : DIRECTIONS) {
                 BlockPos powerBlockPos = pistonPos.offset(direction);
-                findPowerBlockForPistonInternal(deduplicationMap, world, powerBlockPos, pistonPos, pistonHeadPos, isRedstoneTorch, isLever, pistonFace);
+                findPowerBlockForPistonInternal(deduplicationMapSolidDependBlock, deduplicationMapReplaceableDependBlock, world, powerBlockPos, pistonPos, pistonHeadPos, isRedstoneTorch, isLever, pistonFace);
                 powerBlockPos = powerBlockPos.up();
-                findPowerBlockForPistonInternal(deduplicationMap, world, powerBlockPos, pistonPos, pistonHeadPos, isRedstoneTorch, isLever, pistonFace);
+                findPowerBlockForPistonInternal(deduplicationMapSolidDependBlock, deduplicationMapReplaceableDependBlock, world, powerBlockPos, pistonPos, pistonHeadPos, isRedstoneTorch, isLever, pistonFace);
             }
         }
-        possiblePistonPowerInfos.addAll(deduplicationMap.values());
+        possiblePistonPowerInfos.addAll(deduplicationMapSolidDependBlock.values());
+        possiblePistonPowerInfos.addAll(deduplicationMapReplaceableDependBlock.values());
     }
 
-    private static void findPowerBlockForPistonInternal(Map<PistonPowerInfo, PistonPowerInfo> deduplicationMap, World world, BlockPos powerBlockPos, BlockPos pistonPos, BlockPos pistonHeadPos, boolean isRedstoneTorch, boolean isLever, Direction pistonFace) {
+    private static void findPowerBlockForPistonInternal(Map<PistonPowerInfo, PistonPowerInfo> deduplicationMapSolidDependBlock, Map<PistonPowerInfo, PistonPowerInfo> deduplicationMapReplaceableDependBlock, World world, BlockPos powerBlockPos, BlockPos pistonPos, BlockPos pistonHeadPos, boolean isRedstoneTorch, boolean isLever, Direction pistonFace) {
         if (!powerBlockPos.equals(pistonPos)
                 && !powerBlockPos.equals(pistonHeadPos)
                 && world.isInBuildLimit(powerBlockPos)
@@ -111,7 +114,7 @@ public final class BlockFinder {
                     if (!dependBlockPos.equals(pistonPos)
                             && !dependBlockPos.equals(pistonHeadPos)
                             && world.isInBuildLimit(dependBlockPos)) {
-                        findPowerBlockForPistonInternal2(deduplicationMap, world, dependDirection, dependBlockPos, isRedstoneTorch, powerBlockPos, isLever, pistonPos, pistonFace);
+                        findPowerBlockForPistonInternal2(deduplicationMapSolidDependBlock, deduplicationMapReplaceableDependBlock, world, dependDirection, dependBlockPos, isRedstoneTorch && !dependBlockPos.equals(pistonPos.up()), powerBlockPos, isLever, pistonPos, pistonFace);
                     }
                 }
             } else if (state.isSolidBlock(world, powerBlockPos) && state.isFullCube(world, powerBlockPos)) {
@@ -122,19 +125,19 @@ public final class BlockFinder {
                             && world.isInBuildLimit(actualPowerBlockPos)
                             && world.getBlockState(actualPowerBlockPos).isReplaceable()
                     ) {
-                        findPowerBlockForPistonInternal2(deduplicationMap, world, dependDirection.getOpposite(), powerBlockPos, false, actualPowerBlockPos, isLever, pistonPos, pistonFace);
+                        findPowerBlockForPistonInternal2(deduplicationMapSolidDependBlock, deduplicationMapReplaceableDependBlock, world, dependDirection.getOpposite(), powerBlockPos, false, actualPowerBlockPos, isLever, pistonPos, pistonFace);
                     }
                 }
             }
         }
     }
 
-    private static void findPowerBlockForPistonInternal2(Map<PistonPowerInfo, PistonPowerInfo> deduplicationMap, World world, Direction dependDirection, BlockPos dependBlockPos, boolean isRedstoneTorch, BlockPos powerBlockPos, boolean isLever, BlockPos pistonPos, Direction pistonFace) {
+    private static void findPowerBlockForPistonInternal2(Map<PistonPowerInfo, PistonPowerInfo> deduplicationMapSolidDependBlock, Map<PistonPowerInfo, PistonPowerInfo> deduplicationMapReplaceableDependBlock, World world, Direction dependDirection, BlockPos dependBlockPos, boolean isRedstoneTorch, BlockPos powerBlockPos, boolean isLever, BlockPos pistonPos, Direction pistonFace) {
         BlockState dependBlockState = world.getBlockState(dependBlockPos);
-        if (dependBlockState.isReplaceable() || (Block.sideCoversSmallSquare(world, dependBlockPos, dependDirection.getOpposite()) && !(dependBlockState.getBlock() instanceof PistonBlock))) {
+        final boolean dependBlockIsReplaceable = dependBlockState.isReplaceable();
+        if ((dependBlockIsReplaceable && world.canPlace(Blocks.STONE.getDefaultState(), dependBlockPos, ShapeContext.absent())) || (Block.sideCoversSmallSquare(world, dependBlockPos, dependDirection.getOpposite()) && !(dependBlockState.getBlock() instanceof PistonBlock))) {
             boolean redstoneTorch = false;
             boolean lever = false;
-            final PowerBlockType type;
             // 找到能源方块和其附着方向，检查会不会干扰其他task或被其他方块干扰
             if (isRedstoneTorch) {
                 check:
@@ -142,6 +145,24 @@ public final class BlockFinder {
                     // 红石火把不能附着在上方的方块
                     if (dependDirection == Direction.UP)
                         break check;
+                    // 把这个检测移到前面了，看看有没有用
+                    /*
+                    // 如果红石火把依附在目标活塞上（前面判断过），
+                    // 或者依附在目标活塞的正上方的方块上，
+                    // 或者依附在目标活塞紧挨着的方块上且红石火把是斜插着，无法激活目标活塞
+                    for (Direction direction : DIRECTIONS) {
+                        if (dependBlockPos.equals(pistonPos.offset(direction))) {
+                            if (direction == Direction.UP) {
+                                break check;
+                            } else {
+                                if (dependDirection != Direction.DOWN) {
+                                    break check;
+                                }
+                            }
+                            break;
+                        }
+                    }
+                     */
                     // 如果有其他能源方块正在激活附着方块，不能放置
                     if (world.getReceivedStrongRedstonePower(dependBlockPos) > 0)
                         break check;
@@ -225,17 +246,9 @@ public final class BlockFinder {
                     lever = true;
                 }
             }
-            if (redstoneTorch) {
-                if (lever)
-                    type = PowerBlockType.Both;
-                else
-                    type = PowerBlockType.RedstoneTorch;
-            } else if (lever) {
-                type = PowerBlockType.Lever;
-            } else {
-                type = null;
-            }
+            final PowerBlockType type = PowerBlockType.of(redstoneTorch, lever);
             if (type != null) {
+                final Map<PistonPowerInfo, PistonPowerInfo> deduplicationMap = dependBlockIsReplaceable ? deduplicationMapReplaceableDependBlock : deduplicationMapSolidDependBlock;
                 PistonPowerInfo pistonPowerInfo = PistonPowerInfo.of(
                         pistonPos, pistonFace, powerBlockPos,
                         dependDirection.getOpposite(), type);

@@ -14,7 +14,7 @@ public final class RotationUtils {
     {
         rotations.add(Rotation.None.INSTANCE);
     }
-    //private Rotation rotation = Rotation.None.INSTANCE;
+    private boolean keepRotationToNextTick = false;
 
     public Rotation getRotation() {
         return rotations.getFirst();
@@ -51,17 +51,29 @@ public final class RotationUtils {
         return getRotation().getPitch(defaultPitch);
     }
 
+    public boolean canSetRotation(float yaw, float pitch) {
+        final Rotation oldRotation = getRotation();
+        return (!oldRotation.hasYaw() || oldRotation.getYaw() == yaw)
+                && (!oldRotation.hasPitch() || oldRotation.getPitch() == pitch);
+    }
+
     public boolean trySetRotation(float yaw, float pitch) {
         final Rotation oldRotation = getRotation();
-        if (oldRotation.hasYaw() || oldRotation.hasPitch())
+        if ((oldRotation.hasYaw() && oldRotation.getYaw() != yaw)
+                || (oldRotation.hasPitch() && oldRotation.getPitch() != pitch))
             return false;
         setRotation(new Rotation.Full(yaw, pitch));
         return true;
     }
 
+    public boolean canSetYaw(float yaw) {
+        final Rotation oldRotation = getRotation();
+        return !oldRotation.hasYaw() || oldRotation.getYaw() == yaw;
+    }
+
     public boolean trySetYaw(float yaw) {
         final Rotation oldRotation = getRotation();
-        if (oldRotation.hasYaw())
+        if (oldRotation.hasYaw() && oldRotation.getYaw() != yaw)
             return false;
         else if (oldRotation.hasPitch())
             setRotation(new Rotation.Full(yaw, oldRotation.getPitch()));
@@ -70,15 +82,25 @@ public final class RotationUtils {
         return true;
     }
 
+    public boolean canSetPitch(float pitch) {
+        final Rotation oldRotation = getRotation();
+        return !oldRotation.hasPitch() || oldRotation.getPitch() == pitch;
+    }
+
     public boolean trySetPitch(float pitch) {
         Rotation oldRotation = getRotation();
-        if (oldRotation.hasPitch())
+        if (oldRotation.hasPitch() && oldRotation.getPitch() != pitch)
             return false;
         if (oldRotation.hasYaw())
             setRotation(new Rotation.Full(oldRotation.getYaw(), pitch));
         else
             setRotation(new Rotation.PitchOnly(pitch));
         return true;
+    }
+
+    public void updateLocation(ClientPlayerEntity player) {
+        final ClientPlayerEntityAccessor playerAccessor = (ClientPlayerEntityAccessor) player;
+        playerAccessor.invokeSendMovementPackets();
     }
 
     public void useLocationDuring(double x, double y, double z, float yaw, float pitch, boolean onGround, Runnable runnable) {
@@ -161,11 +183,18 @@ public final class RotationUtils {
         runnable.run();
     }
 
-    public void resetRotation() {
+    public void markKeepRotation() {
+        keepRotationToNextTick = true;
+    }
+
+    public void resetRotationIfNoKeepRotation() {
         if (rotations.size() > 1) {
             throw new IllegalStateException("called resetRotation() during calling useRotationDuring()");
         }
-        setRotation(Rotation.None.INSTANCE);
+        if (keepRotationToNextTick)
+            keepRotationToNextTick = false;
+        else
+            setRotation(Rotation.None.INSTANCE);
     }
 
 }

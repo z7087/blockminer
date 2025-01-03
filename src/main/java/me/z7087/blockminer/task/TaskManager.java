@@ -17,8 +17,12 @@ public class TaskManager {
     private final Set<BlockPos> posSet = new HashSet<>();
     private final LinkedList<Task> taskQueue = new LinkedList<>();
     public void tick() {
+        BlockMinerMod.INSTANCE.rotationUtils.resetRotationIfNoKeepRotation();
         if (!enabled)
             return;
+        if (MinecraftClient.getInstance().player == null) {
+            return;
+        }
         final ClientWorld world = MinecraftClient.getInstance().world;
         if (world == null) {
             this.prevWorldRef = null;
@@ -42,7 +46,6 @@ public class TaskManager {
             if (ignoreOtherTasks)
                 break;
         }
-        BlockMinerMod.INSTANCE.rotationUtils.resetRotation();
     }
     public boolean handleAttackBlock(BlockPos blockPos) {
         if (!enabled)
@@ -94,6 +97,7 @@ public class TaskManager {
 
     private void onDisable() {
         this.enabled = false;
+        this.prevWorldRef = null;
         clearTasks();
     }
 }

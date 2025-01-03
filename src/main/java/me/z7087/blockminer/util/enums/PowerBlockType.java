@@ -26,6 +26,18 @@ public enum PowerBlockType {
                 "No enum constant " + PowerBlockType.class.getCanonicalName() + "." + name);
     }
 
+    public static PowerBlockType of(boolean isRedstoneTorch, boolean isLever) {
+        if (isRedstoneTorch) {
+            if (isLever) {
+                return Both;
+            }
+            return RedstoneTorch;
+        } else if (isLever) {
+            return Lever;
+        }
+        return null;
+    }
+
     public boolean isRedstoneTorch() {
         return this != Lever;
     }

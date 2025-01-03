@@ -2,6 +2,7 @@ package me.z7087.blockminer;
 
 import me.z7087.blockminer.config.Config;
 import me.z7087.blockminer.task.TaskManager;
+import me.z7087.blockminer.util.BlockBreakUtils;
 import me.z7087.blockminer.util.RotationUtils;
 import net.fabricmc.api.ClientModInitializer;
 import org.slf4j.Logger;
@@ -13,6 +14,7 @@ public final class BlockMinerMod implements ClientModInitializer {
     public static BlockMinerMod INSTANCE;
     public Config config = Config.createDefaultConfig();
     public final TaskManager taskManager = new TaskManager();
+    public final BlockBreakUtils blockBreakUtils = new BlockBreakUtils();
     public final RotationUtils rotationUtils = new RotationUtils();
 
     public BlockMinerMod() {

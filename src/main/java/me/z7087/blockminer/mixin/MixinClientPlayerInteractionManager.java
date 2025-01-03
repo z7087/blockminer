@@ -18,8 +18,6 @@ public abstract class MixinClientPlayerInteractionManager {
 
     @Inject(method = "tick", at = @At(value = "RETURN"))
     private void onTick(CallbackInfo ci) {
-        MinecraftClient client = this.client;
-        if (client.player != null && client.world != null)
-            BlockMinerMod.INSTANCE.taskManager.tick();
+        BlockMinerMod.INSTANCE.taskManager.tick();
     }
 }
