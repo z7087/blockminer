@@ -7,7 +7,6 @@ import org.spongepowered.asm.mixin.gen.Invoker;
 
 @Mixin(ClientPlayerEntity.class)
 public interface ClientPlayerEntityAccessor {
-    /*
     @Accessor
     double getLastX();
     @Accessor
@@ -42,7 +41,6 @@ public interface ClientPlayerEntityAccessor {
     int getTicksSinceLastPositionPacketSent();
     @Accessor
     void setTicksSinceLastPositionPacketSent(int ticksSinceLastPositionPacketSent);
-     */
 
     @Invoker
     void invokeSendMovementPackets();

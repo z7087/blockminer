@@ -209,6 +209,7 @@ public class Task implements Comparable<Task> {
                     }
                     case PlaceBlocksWithoutChecks: {
                         ClientPlayerInteractionManager interactionManager = Objects.requireNonNull(MinecraftClient.getInstance().interactionManager);
+                        RotationUtils rotationUtils = BlockMinerMod.INSTANCE.rotationUtils;
                         if (player.currentScreenHandler != player.playerScreenHandler) {
                             state = TaskState.Start;
                             break loop;
@@ -217,13 +218,17 @@ public class Task implements Comparable<Task> {
                             // 凭空放置
                             ActionResult result = InventoryUtils.moveToOffhandDuring(player,
                                     pistonIndex,
-                                    () -> interactionManager.interactBlock(player,
-                                            Hand.OFF_HAND,
-                                            new BlockHitResult(
-                                                    Vec3d.of(pistonPowerInfo.pistonPos),
-                                                    Direction.DOWN,
-                                                    pistonPowerInfo.pistonPos,
-                                                    false
+                                    () -> rotationUtils.useServerSideRotationDuring(
+                                            player,
+                                            () -> interactionManager.interactBlock(
+                                                    player,
+                                                    Hand.OFF_HAND,
+                                                    new BlockHitResult(
+                                                            Vec3d.of(pistonPowerInfo.pistonPos),
+                                                            Direction.DOWN,
+                                                            pistonPowerInfo.pistonPos,
+                                                            false
+                                                    )
                                             )
                                     )
                             );
@@ -394,6 +399,7 @@ public class Task implements Comparable<Task> {
                     }
                     case Execute: {
                         ClientPlayerInteractionManager interactionManager = Objects.requireNonNull(MinecraftClient.getInstance().interactionManager);
+                        RotationUtils rotationUtils = BlockMinerMod.INSTANCE.rotationUtils;
                         if (pickaxeIndex != -1) {
                             player.getInventory().selectedSlot = pickaxeIndex;
                             ((ClientPlayerInteractionManagerAccessor) interactionManager).invokeSyncSelectedSlot();
@@ -467,15 +473,22 @@ public class Task implements Comparable<Task> {
                             BlockMinerMod.INSTANCE.blockBreakUtils.setBreaking(false);
                         }
                         // 重新凭空放置活塞
-                        ActionResult result = InventoryUtils.moveToOffhandDuring(player, pistonIndex, () -> interactionManager.interactBlock(player,
-                                Hand.OFF_HAND,
-                                new BlockHitResult(
-                                        Vec3d.of(pistonPowerInfo.pistonPos),
-                                        Direction.DOWN,
-                                        pistonPowerInfo.pistonPos,
-                                        false
+                        ActionResult result = InventoryUtils.moveToOffhandDuring(
+                                player,
+                                pistonIndex,
+                                () -> rotationUtils.useServerSideRotationDuring(
+                                        player,
+                                        () -> interactionManager.interactBlock(player,
+                                                Hand.OFF_HAND,
+                                                new BlockHitResult(
+                                                        Vec3d.of(pistonPowerInfo.pistonPos),
+                                                        Direction.DOWN,
+                                                        pistonPowerInfo.pistonPos,
+                                                        false
+                                                )
+                                        )
                                 )
-                        ));
+                        );
                         if (!result.isAccepted()) {
                             // ?????
                             state = TaskState.Start;

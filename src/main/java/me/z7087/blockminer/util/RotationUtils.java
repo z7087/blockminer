@@ -8,6 +8,7 @@ import net.minecraft.util.math.Box;
 
 import java.util.Deque;
 import java.util.LinkedList;
+import java.util.function.Supplier;
 
 public final class RotationUtils {
     private final Deque<Rotation> rotations = new LinkedList<>();
@@ -181,6 +182,18 @@ public final class RotationUtils {
             return;
         }
         runnable.run();
+    }
+
+    public <T> T useServerSideRotationDuring(ClientPlayerEntity player, Supplier<T> supplier) {
+        final ClientPlayerEntityAccessor playerAccessor = (ClientPlayerEntityAccessor) player;
+        float originYaw = player.getYaw();
+        float originPitch = player.getPitch();
+        player.setYaw(playerAccessor.getLastYaw());
+        player.setPitch(playerAccessor.getLastPitch());
+        T result = supplier.get();
+        player.setYaw(originYaw);
+        player.setPitch(originPitch);
+        return result;
     }
 
     public void markKeepRotation() {
