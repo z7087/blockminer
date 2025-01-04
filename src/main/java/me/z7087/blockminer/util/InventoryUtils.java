@@ -14,6 +14,7 @@ import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
+import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.registry.tag.FluidTags;
 import net.minecraft.screen.PlayerScreenHandler;
@@ -22,6 +23,7 @@ import net.minecraft.util.collection.DefaultedList;
 
 import java.util.Comparator;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
@@ -159,7 +161,7 @@ public final class InventoryUtils {
         if (f > 1.0F) {
             // 获取itemStack的附魔集合
             for (RegistryEntry<Enchantment> enchantment : itemStack.getEnchantments().getEnchantments()) {
-                var enchantmentKey = enchantment.getKey();
+                Optional<RegistryKey<Enchantment>> enchantmentKey = enchantment.getKey();
                 if (enchantmentKey.isPresent()) {
                     // 获取效率附魔等级
                     if (enchantmentKey.get() == Enchantments.EFFICIENCY) {
@@ -167,6 +169,7 @@ public final class InventoryUtils {
                         if (toolLevel > 0 && !itemStack.isEmpty()) {
                             f += (float) (toolLevel * toolLevel + 1);
                         }
+                        break;
                     }
                 }
             }
