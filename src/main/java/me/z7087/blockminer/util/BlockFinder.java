@@ -82,12 +82,12 @@ public final class BlockFinder {
                                                PowerBlockType powerBlockUsage,
                                                List<Pair<BlockPos, Direction>> possiblePistonLocations,
                                                List<PistonPowerInfo> possiblePistonPowerInfos,
-                                               boolean hasSlimeBlock
+                                               boolean hasDependBlock
     ) {
         final boolean isRedstoneTorch = powerBlockUsage.isRedstoneTorch();
         final boolean isLever = powerBlockUsage.isLever();
         final LinkedHashMap<PistonPowerInfo, PistonPowerInfo> deduplicationMapSolidDependBlock = new LinkedHashMap<>();
-        final LinkedHashMap<PistonPowerInfo, PistonPowerInfo> deduplicationMapReplaceableDependBlock = hasSlimeBlock ? new LinkedHashMap<>() : null;
+        final LinkedHashMap<PistonPowerInfo, PistonPowerInfo> deduplicationMapReplaceableDependBlock = hasDependBlock ? new LinkedHashMap<>() : null;
         for (Pair<BlockPos, Direction> location : possiblePistonLocations) {
             BlockPos pistonPos = location.first;
             Direction pistonFace = location.second;

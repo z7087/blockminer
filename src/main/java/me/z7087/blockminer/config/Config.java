@@ -9,6 +9,8 @@ import me.z7087.blockminer.util.enums.PowerBlockType;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
+import net.minecraft.item.Item;
+import net.minecraft.item.Items;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.entry.RegistryEntry.Reference;
 import net.minecraft.util.Identifier;
@@ -32,9 +34,45 @@ public class Config {
     public PowerBlockType powerBlockUsage = PowerBlockType.Both;
     public final Set<Block> blockWhiteList = new HashSet<>();
 
+    private final Set<Block> dependBlockWhiteList = new HashSet<>();
+    private final transient Set<Item> dependBlockItemWhiteList = new HashSet<>();
+
+    public boolean dependBlockWhiteListContains(Block block) {
+        return dependBlockWhiteList.contains(block);
+    }
+
+    public boolean dependBlockWhiteListContains(Item item) {
+        return dependBlockItemWhiteList.contains(item);
+    }
+
+    public boolean dependBlockWhiteListAdd(Block block) {
+        boolean result = dependBlockWhiteList.add(block);
+        if (result) {
+            Item item = block.asItem();
+            if (item != Items.AIR) {
+                dependBlockItemWhiteList.add(item);
+            }
+        }
+        return result;
+    }
+
+    public boolean dependBlockWhiteListRemove(Block block) {
+        boolean result = dependBlockWhiteList.remove(block);
+        if (result) {
+            Item item = block.asItem();
+            if (item != Items.AIR) {
+                dependBlockItemWhiteList.remove(item);
+            }
+        }
+        return result;
+    }
+
     public static Config createDefaultConfig() {
         final Config config = new Config();
         config.blockWhiteList.addAll(getDefaultBlockWhitelist());
+        for (Block block : getDefaultDependBlockWhitelist()) {
+            config.dependBlockWhiteListAdd(block);
+        }
         return config;
     }
 
@@ -95,6 +133,12 @@ public class Config {
         return blocks;
     }
 
+    public static Set<Block> getDefaultDependBlockWhitelist() {
+        final Set<Block> blocks = new HashSet<>();
+        blocks.add(Blocks.SLIME_BLOCK);
+        return blocks;
+    }
+
     private static final class ConfigTypeAdapter extends TypeAdapter<Config> {
         @Override
         public void write(JsonWriter out, Config config) throws IOException {
@@ -106,6 +150,16 @@ public class Config {
             {
                 out.name("whitelist").beginArray();
                 for (Block block : config.blockWhiteList) {
+                    Identifier id = Registries.BLOCK.getId(block);
+                    if (id != defaultId) {
+                        out.value(id.toString());
+                    }
+                }
+                out.endArray();
+            }
+            {
+                out.name("dependBlockWhiteList").beginArray();
+                for (Block block : config.dependBlockWhiteList) {
                     Identifier id = Registries.BLOCK.getId(block);
                     if (id != defaultId) {
                         out.value(id.toString());
@@ -144,6 +198,23 @@ public class Config {
                                 if (entry.isPresent()) {
                                     Reference<Block> block = entry.get();
                                     if (!config.blockWhiteList.add(block.value())) {
+                                        BlockMinerMod.LOGGER.debug("Duplicate block during config loading: {}", id);
+                                    }
+                                } else {
+                                    BlockMinerMod.LOGGER.debug("Block identifier not found during config loading, ignored: {}", id);
+                                }
+                            }
+                            in.endArray();
+                            break;
+                        }
+                        case "dependBlockWhitelist": {
+                            in.beginArray();
+                            while (in.hasNext()) {
+                                final String id = in.nextString();
+                                Optional<Reference<Block>> entry = Registries.BLOCK.getEntry(Identifier.of(id));
+                                if (entry.isPresent()) {
+                                    Reference<Block> block = entry.get();
+                                    if (!config.dependBlockWhiteListAdd(block.value())) {
                                         BlockMinerMod.LOGGER.debug("Duplicate block during config loading: {}", id);
                                     }
                                 } else {
