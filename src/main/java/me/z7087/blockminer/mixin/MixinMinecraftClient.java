@@ -27,8 +27,10 @@ public abstract class MixinMinecraftClient {
     private void beforeAttackBlock(CallbackInfoReturnable<Boolean> cir) {
         if (cir.getReturnValue() != null)
             return;
-        if (BlockMinerMod.INSTANCE.taskManager.handleAttackBlock(((BlockHitResult) crosshairTarget).getBlockPos()))
+        if (BlockMinerMod.INSTANCE.taskManager.handleAttackBlock(((BlockHitResult) crosshairTarget).getBlockPos())) {
             cir.setReturnValue(true);
+            return;
+        }
         if (BlockMinerMod.INSTANCE.blockBreakUtils.isModBreakingBlock())
             cir.setReturnValue(true);
     }
