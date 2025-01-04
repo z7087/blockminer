@@ -72,10 +72,10 @@ public class Task implements Comparable<Task> {
                         RotationUtils rotationUtils = BlockMinerMod.INSTANCE.rotationUtils;
                         PlayerInventory inventory = player.getInventory();
                         if ((pistonIndex = InventoryUtils.findFirstItemInHotbar(inventory, Items.PISTON)) == -1
-                                || (slimeBlockIndex = InventoryUtils.findFirstItemInHotbar(inventory, Items.SLIME_BLOCK)) == -1
                         ) {
                             break loop;
                         } else {
+                            slimeBlockIndex = InventoryUtils.findFirstItemInHotbar(inventory, Items.SLIME_BLOCK);
                             PowerBlockType powerBlockUsage = BlockMinerMod.INSTANCE.config.powerBlockUsage;
                             pickaxeIndex = InventoryUtils.findBestItemInHotbar(inventory,
                                     (stack ->
@@ -104,7 +104,7 @@ public class Task implements Comparable<Task> {
                         ArrayList<Pair<BlockPos, Direction>> pistonList = new ArrayList<>();
                         BlockFinder.findStablePistons(world, targetPos, pistonList);
                         ArrayList<PistonPowerInfo> pistonPowerInfos = new ArrayList<>();
-                        BlockFinder.findPowerBlockForPiston(world, targetPos, powerBlockUsage, pistonList, pistonPowerInfos);
+                        BlockFinder.findPowerBlockForPiston(world, targetPos, powerBlockUsage, pistonList, pistonPowerInfos, slimeBlockIndex != -1);
                         if (pistonPowerInfos.isEmpty())
                             break loop;
                         for (PistonPowerInfo pistonPowerInfo : pistonPowerInfos) {
@@ -180,7 +180,7 @@ public class Task implements Comparable<Task> {
                         PlayerInventory inventory = player.getInventory();
                         BlockPos dependBlockPos = pistonPowerInfo.powerBlockPos.offset(pistonPowerInfo.powerBlockFace.getOpposite());
                         if (inventory.getStack(pistonIndex).getItem() != Items.PISTON
-                                || inventory.getStack(slimeBlockIndex).getItem() != Items.SLIME_BLOCK
+                                || (slimeBlockIndex != -1 && inventory.getStack(slimeBlockIndex).getItem() != Items.SLIME_BLOCK)
                                 || (redstoneTorchIndex != -1 && inventory.getStack(redstoneTorchIndex).getItem() != Items.REDSTONE_TORCH)
                                 || (leverIndex != -1 && inventory.getStack(leverIndex).getItem() != Items.LEVER)
                                 || !world.getBlockState(pistonPowerInfo.pistonPos).isReplaceable()
@@ -240,6 +240,11 @@ public class Task implements Comparable<Task> {
                         }
                         BlockPos dependBlockPos = pistonPowerInfo.powerBlockPos.offset(pistonPowerInfo.powerBlockFace.getOpposite());
                         if (world.getBlockState(dependBlockPos).isReplaceable()) {
+                            if (slimeBlockIndex == -1) {
+                                // 本来那有个方块但消失了，手里又没有粘液块，回去重找
+                                state = TaskState.Start;
+                                break loop;
+                            }
                             // 凭空放置
                             ActionResult result = InventoryUtils.moveToOffhandDuring(player,
                                     slimeBlockIndex,

@@ -81,12 +81,13 @@ public final class BlockFinder {
                                                BlockPos targetPos,
                                                PowerBlockType powerBlockUsage,
                                                List<Pair<BlockPos, Direction>> possiblePistonLocations,
-                                               List<PistonPowerInfo> possiblePistonPowerInfos
+                                               List<PistonPowerInfo> possiblePistonPowerInfos,
+                                               boolean hasSlimeBlock
     ) {
         final boolean isRedstoneTorch = powerBlockUsage.isRedstoneTorch();
         final boolean isLever = powerBlockUsage.isLever();
         final LinkedHashMap<PistonPowerInfo, PistonPowerInfo> deduplicationMapSolidDependBlock = new LinkedHashMap<>();
-        final LinkedHashMap<PistonPowerInfo, PistonPowerInfo> deduplicationMapReplaceableDependBlock = new LinkedHashMap<>();
+        final LinkedHashMap<PistonPowerInfo, PistonPowerInfo> deduplicationMapReplaceableDependBlock = hasSlimeBlock ? new LinkedHashMap<>() : null;
         for (Pair<BlockPos, Direction> location : possiblePistonLocations) {
             BlockPos pistonPos = location.first;
             Direction pistonFace = location.second;
@@ -99,7 +100,8 @@ public final class BlockFinder {
             }
         }
         possiblePistonPowerInfos.addAll(deduplicationMapSolidDependBlock.values());
-        possiblePistonPowerInfos.addAll(deduplicationMapReplaceableDependBlock.values());
+        if (deduplicationMapReplaceableDependBlock != null)
+            possiblePistonPowerInfos.addAll(deduplicationMapReplaceableDependBlock.values());
     }
 
     private static void findPowerBlockForPistonInternal(Map<PistonPowerInfo, PistonPowerInfo> deduplicationMapSolidDependBlock, Map<PistonPowerInfo, PistonPowerInfo> deduplicationMapReplaceableDependBlock, World world, BlockPos powerBlockPos, BlockPos pistonPos, BlockPos pistonHeadPos, boolean isRedstoneTorch, boolean isLever, Direction pistonFace) {
@@ -253,20 +255,22 @@ public final class BlockFinder {
             final PowerBlockType type = PowerBlockType.of(redstoneTorch, lever);
             if (type != null) {
                 final Map<PistonPowerInfo, PistonPowerInfo> deduplicationMap = dependBlockIsReplaceable ? deduplicationMapReplaceableDependBlock : deduplicationMapSolidDependBlock;
-                PistonPowerInfo pistonPowerInfo = PistonPowerInfo.of(
-                        pistonPos, pistonFace, powerBlockPos,
-                        dependDirection.getOpposite(), type);
-                final PistonPowerInfo oldPistonPowerInfo = deduplicationMap.get(pistonPowerInfo);
-                if (oldPistonPowerInfo != null) {
-                    PowerBlockType oldType = oldPistonPowerInfo.getPowerBlockType();
-                    PowerBlockType mergedType = PowerBlockType.merge(type, oldType);
-                    if (mergedType != oldType) {
-                        pistonPowerInfo = PistonPowerInfo.of(pistonPos, pistonFace,
-                                powerBlockPos, dependDirection.getOpposite(), mergedType);
+                if (deduplicationMap != null) {
+                    PistonPowerInfo pistonPowerInfo = PistonPowerInfo.of(
+                            pistonPos, pistonFace, powerBlockPos,
+                            dependDirection.getOpposite(), type);
+                    final PistonPowerInfo oldPistonPowerInfo = deduplicationMap.get(pistonPowerInfo);
+                    if (oldPistonPowerInfo != null) {
+                        PowerBlockType oldType = oldPistonPowerInfo.getPowerBlockType();
+                        PowerBlockType mergedType = PowerBlockType.merge(type, oldType);
+                        if (mergedType != oldType) {
+                            pistonPowerInfo = PistonPowerInfo.of(pistonPos, pistonFace,
+                                    powerBlockPos, dependDirection.getOpposite(), mergedType);
+                            deduplicationMap.put(pistonPowerInfo, pistonPowerInfo);
+                        }
+                    } else {
                         deduplicationMap.put(pistonPowerInfo, pistonPowerInfo);
                     }
-                } else {
-                    deduplicationMap.put(pistonPowerInfo, pistonPowerInfo);
                 }
             }
         }
