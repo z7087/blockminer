@@ -40,7 +40,7 @@ public abstract class MixinMinecraftClient {
         return interactionManager.interactBlock(player, hand, hitResult);
     }
 
-    @Inject(method = "handleBlockBreaking", at = @At(value = "FIELD", target = "Lnet/minecraft/client/MinecraftClient;attackCooldown:I", opcode = Opcodes.PUTFIELD), cancellable = true)
+    @Inject(method = "handleBlockBreaking", at = @At(value = "FIELD", target = "Lnet/minecraft/client/MinecraftClient;attackCooldown:I", opcode = Opcodes.GETFIELD), cancellable = true)
     private void beforeBlockBreaking(CallbackInfo ci) {
         if (BlockMinerMod.INSTANCE.blockBreakUtils.isModBreakingBlock()) {
             ci.cancel();
