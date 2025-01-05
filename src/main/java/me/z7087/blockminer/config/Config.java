@@ -101,7 +101,7 @@ public class Config {
         } catch (FileNotFoundException ignored) {
             return null;
         } catch (Exception e) {
-            BlockMinerMod.LOGGER.warn(null, e);
+            BlockMinerMod.LOGGER.warn("{}", e.getMessage(), e);
             return null;
         } finally {
             if (reader != null) {
@@ -211,7 +211,7 @@ public class Config {
                             in.endArray();
                             break;
                         }
-                        case "dependBlockWhitelist": {
+                        case "dependBlockWhiteList": {
                             in.beginArray();
                             while (in.hasNext()) {
                                 final String id = in.nextString();
