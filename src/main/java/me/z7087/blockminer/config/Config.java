@@ -30,6 +30,7 @@ public class Config {
                 .create();
     }
     public boolean debug = false;
+    public boolean hello = true;
     public int pingSpikeThreshold = 0;
     public PowerBlockType powerBlockUsage = PowerBlockType.Both;
     public final Set<Block> blockWhitelist = new HashSet<>();
@@ -148,6 +149,8 @@ public class Config {
         public void write(JsonWriter out, Config config) throws IOException {
             out.beginObject();
             out.name("debug").value(config.debug);
+            if (!config.hello)
+                out.name("hello").value(config.hello);
             out.name("ping-spike-threshold").value(config.pingSpikeThreshold);
             out.name("power-block-usage").value(config.powerBlockUsage.toString());
             final Identifier defaultId = Registries.BLOCK.getDefaultId();
@@ -184,6 +187,10 @@ public class Config {
                     switch (name) {
                         case "debug": {
                             config.debug = in.nextBoolean();
+                            break;
+                        }
+                        case "hello": {
+                            config.hello = in.nextBoolean();
                             break;
                         }
                         case "ping-spike-threshold": {

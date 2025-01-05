@@ -4,6 +4,7 @@
   "package": "me.z7087.blockminer.mixin",
   "compatibilityLevel": "JAVA_17",
   "mixins": [
+    "MixinClientLoginNetworkHandler"
   ],
   "client": [
     "ClientPlayerEntityAccessor",

@@ -68,6 +68,10 @@ public class TaskManager {
         return true;
     }
 
+    public boolean isEnabled() {
+        return enabled;
+    }
+
     public void toggle() {
         if (enabled) {
             onDisable();
