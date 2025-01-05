@@ -3,12 +3,15 @@
   "id": "blockminer",
   "version": "${version}",
   "name": "blockminer",
-  "description": "",
-  "authors": [],
+  "description": "Client mod to mine unbreakable blocks",
+  "authors": [
+    "7087z",
+    "Bunny_i"
+  ],
   "contact": {},
   "license": "All-Rights-Reserved",
   "icon": "assets/blockminer/icon.png",
-  "environment": "*",
+  "environment": "client",
   "entrypoints": {
     "client": [
       "me.z7087.blockminer.BlockMinerMod"
@@ -21,6 +24,7 @@
   ],
   "depends": {
     "fabricloader": ">=${loader_version}",
-    "minecraft": "${minecraft_version}"
+    "minecraft": "${minecraft_version}",
+    "fabric-api": "*"
   }
 }

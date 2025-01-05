@@ -37,6 +37,10 @@ public class Config {
     private final Set<Block> dependBlockWhiteList = new HashSet<>();
     private final transient Set<Item> dependBlockItemWhiteList = new HashSet<>();
 
+    public String dependBlockWhiteListToString() {
+        return dependBlockWhiteList.toString();
+    }
+
     public boolean dependBlockWhiteListContains(Block block) {
         return dependBlockWhiteList.contains(block);
     }

@@ -200,6 +200,11 @@ public final class RotationUtils {
         keepRotationToNextTick = true;
     }
 
+    public void forceClearRotations() {
+        rotations.clear();
+        rotations.add(Rotation.None.INSTANCE);
+    }
+
     public void resetRotationIfNoKeepRotation() {
         if (rotations.size() > 1) {
             throw new IllegalStateException("called resetRotation() during calling useRotationDuring()");

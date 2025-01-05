@@ -61,20 +61,23 @@ public class TaskManager {
         return true;
     }
     public boolean handleUseOnBlock(BlockPos targetBlock) {
-        final MinecraftClient mc = MinecraftClient.getInstance();
-        final ClientWorld world = Objects.requireNonNull(mc.world);
+        final ClientWorld world = Objects.requireNonNull(MinecraftClient.getInstance().world);
         if (!BlockMinerMod.INSTANCE.config.blockWhiteList.contains(world.getBlockState(targetBlock).getBlock()))
             return false;
+        toggle();
+        return true;
+    }
+
+    public void toggle() {
         if (enabled) {
             onDisable();
             MessageUtils.printMessage(I18n.TOGGLE_OFF);
         } else {
             onEnable();
             MessageUtils.printMessage(I18n.TOGGLE_ON);
-            if (!mc.isInSingleplayer())
+            if (!MinecraftClient.getInstance().isInSingleplayer())
                 MessageUtils.printMessage(I18n.WARN_MULTIPLAYER);
         }
-        return true;
     }
 
     private void clearTasks() {
@@ -99,5 +102,7 @@ public class TaskManager {
         this.enabled = false;
         this.prevWorldRef = null;
         clearTasks();
+        BlockMinerMod.INSTANCE.rotationUtils.forceClearRotations();
+        BlockMinerMod.INSTANCE.blockBreakUtils.setBreaking(false);
     }
 }
