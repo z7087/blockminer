@@ -8,7 +8,9 @@
     "7087z",
     "Bunny_i"
   ],
-  "contact": {},
+  "contact": {
+    "sources": "https://github.com/z7087/blockminer"
+  },
   "license": "All-Rights-Reserved",
   "icon": "assets/blockminer/icon.png",
   "environment": "client",
@@ -24,7 +26,9 @@
   ],
   "depends": {
     "fabricloader": ">=${loader_version}",
-    "minecraft": "${minecraft_version}",
+    "minecraft": "${minecraft_version}"
+  },
+  "recommends": {
     "fabric-api": "*"
   }
 }
