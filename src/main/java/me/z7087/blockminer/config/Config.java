@@ -162,7 +162,7 @@ public class Config {
                 out.endArray();
             }
             {
-                out.name("dependBlockWhiteList").beginArray();
+                out.name("depend-block-whitelist").beginArray();
                 for (Block block : config.dependBlockWhiteList) {
                     Identifier id = Registries.BLOCK.getId(block);
                     if (id != defaultId) {
@@ -211,7 +211,7 @@ public class Config {
                             in.endArray();
                             break;
                         }
-                        case "dependBlockWhiteList": {
+                        case "depend-block-whitelist": {
                             in.beginArray();
                             while (in.hasNext()) {
                                 final String id = in.nextString();
