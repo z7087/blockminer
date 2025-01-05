@@ -8,7 +8,11 @@
 name: Java CI with Gradle
 
 on:
-  [push, pull_request, workflow_dispatch]
+  push:
+    paths-ignore:
+      - '*.md'
+  pull_request:
+  workflow_dispatch:
 
 jobs:
   build:
