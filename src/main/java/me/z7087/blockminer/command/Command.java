@@ -130,7 +130,7 @@ public final class Command {
                     ).then(literal("target-block")
                             .then(literal("whitelist")
                                     .executes((context) -> {
-                                        context.getSource().sendFeedback(Text.literal(BlockMinerMod.INSTANCE.config.blockWhiteList.toString()));
+                                        context.getSource().sendFeedback(Text.literal(BlockMinerMod.INSTANCE.config.blockWhitelist.toString()));
                                         return 1;
                                     })
                                     .then(literal("add")
@@ -139,7 +139,7 @@ public final class Command {
                                                             .executes(context -> {
                                                                 Config config = BlockMinerMod.INSTANCE.config;
                                                                 Block input = context.getArgument("block", BlockStateArgument.class).getBlockState().getBlock();
-                                                                if (config.blockWhiteList.add(input)) {
+                                                                if (config.blockWhitelist.add(input)) {
                                                                     BlockMinerMod.INSTANCE.tryToSaveConfig();
                                                                     return 1;
                                                                 }
@@ -153,7 +153,7 @@ public final class Command {
                                                             .executes(context -> {
                                                                 Config config = BlockMinerMod.INSTANCE.config;
                                                                 Block input = context.getArgument("block", BlockStateArgument.class).getBlockState().getBlock();
-                                                                if (config.blockWhiteList.remove(input)) {
+                                                                if (config.blockWhitelist.remove(input)) {
                                                                     BlockMinerMod.INSTANCE.tryToSaveConfig();
                                                                     return 1;
                                                                 }
@@ -166,7 +166,7 @@ public final class Command {
                     ).then(literal("depend-block")
                             .then(literal("whitelist")
                                     .executes((context) -> {
-                                        context.getSource().sendFeedback(Text.literal(BlockMinerMod.INSTANCE.config.dependBlockWhiteListToString()));
+                                        context.getSource().sendFeedback(Text.literal(BlockMinerMod.INSTANCE.config.dependBlockWhitelistToString()));
                                         return 1;
                                     })
                                     .then(literal("add")
@@ -175,7 +175,7 @@ public final class Command {
                                                             .executes(context -> {
                                                                 Config config = BlockMinerMod.INSTANCE.config;
                                                                 Block input = context.getArgument("block", BlockStateArgument.class).getBlockState().getBlock();
-                                                                if (config.dependBlockWhiteListAdd(input)) {
+                                                                if (config.dependBlockWhitelistAdd(input)) {
                                                                     BlockMinerMod.INSTANCE.tryToSaveConfig();
                                                                     return 1;
                                                                 }
@@ -189,7 +189,7 @@ public final class Command {
                                                             .executes(context -> {
                                                                 Config config = BlockMinerMod.INSTANCE.config;
                                                                 Block input = context.getArgument("block", BlockStateArgument.class).getBlockState().getBlock();
-                                                                if (config.dependBlockWhiteListRemove(input)) {
+                                                                if (config.dependBlockWhitelistRemove(input)) {
                                                                     BlockMinerMod.INSTANCE.tryToSaveConfig();
                                                                     return 1;
                                                                 }

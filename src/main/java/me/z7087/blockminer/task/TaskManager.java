@@ -51,7 +51,7 @@ public class TaskManager {
         if (!enabled)
             return false;
         final ClientWorld world = Objects.requireNonNull(MinecraftClient.getInstance().world);
-        if (!BlockMinerMod.INSTANCE.config.blockWhiteList.contains(world.getBlockState(blockPos).getBlock()))
+        if (!BlockMinerMod.INSTANCE.config.blockWhitelist.contains(world.getBlockState(blockPos).getBlock()))
             return false;
         if (posSet.contains(blockPos))
             return false;
@@ -62,7 +62,7 @@ public class TaskManager {
     }
     public boolean handleUseOnBlock(BlockPos targetBlock) {
         final ClientWorld world = Objects.requireNonNull(MinecraftClient.getInstance().world);
-        if (!BlockMinerMod.INSTANCE.config.blockWhiteList.contains(world.getBlockState(targetBlock).getBlock()))
+        if (!BlockMinerMod.INSTANCE.config.blockWhitelist.contains(world.getBlockState(targetBlock).getBlock()))
             return false;
         toggle();
         return true;

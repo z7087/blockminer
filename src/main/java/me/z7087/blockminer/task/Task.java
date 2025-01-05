@@ -75,7 +75,7 @@ public class Task implements Comparable<Task> {
                         ) {
                             break loop;
                         } else {
-                            dependBlockIndex = InventoryUtils.findFirstItemInHotbar(inventory, (stack) -> BlockMinerMod.INSTANCE.config.dependBlockWhiteListContains(stack.getItem()));
+                            dependBlockIndex = InventoryUtils.findFirstItemInHotbar(inventory, (stack) -> BlockMinerMod.INSTANCE.config.dependBlockWhitelistContains(stack.getItem()));
                             PowerBlockType powerBlockUsage = BlockMinerMod.INSTANCE.config.powerBlockUsage;
                             pickaxeIndex = InventoryUtils.findBestItemInHotbar(inventory,
                                     (stack ->
@@ -180,7 +180,7 @@ public class Task implements Comparable<Task> {
                         PlayerInventory inventory = player.getInventory();
                         BlockPos dependBlockPos = pistonPowerInfo.powerBlockPos.offset(pistonPowerInfo.powerBlockFace.getOpposite());
                         if (inventory.getStack(pistonIndex).getItem() != Items.PISTON
-                                || (dependBlockIndex != -1 && !BlockMinerMod.INSTANCE.config.dependBlockWhiteListContains(inventory.getStack(dependBlockIndex).getItem()))
+                                || (dependBlockIndex != -1 && !BlockMinerMod.INSTANCE.config.dependBlockWhitelistContains(inventory.getStack(dependBlockIndex).getItem()))
                                 || (redstoneTorchIndex != -1 && inventory.getStack(redstoneTorchIndex).getItem() != Items.REDSTONE_TORCH)
                                 || (leverIndex != -1 && inventory.getStack(leverIndex).getItem() != Items.LEVER)
                                 || !world.getBlockState(pistonPowerInfo.pistonPos).isReplaceable()

@@ -32,40 +32,40 @@ public class Config {
     public boolean debug = false;
     public int pingSpikeThreshold = 0;
     public PowerBlockType powerBlockUsage = PowerBlockType.Both;
-    public final Set<Block> blockWhiteList = new HashSet<>();
+    public final Set<Block> blockWhitelist = new HashSet<>();
 
-    private final Set<Block> dependBlockWhiteList = new HashSet<>();
-    private final transient Set<Item> dependBlockItemWhiteList = new HashSet<>();
+    private final Set<Block> dependBlockWhitelist = new HashSet<>();
+    private final transient Set<Item> dependBlockItemWhitelist = new HashSet<>();
 
-    public String dependBlockWhiteListToString() {
-        return dependBlockWhiteList.toString();
+    public String dependBlockWhitelistToString() {
+        return dependBlockWhitelist.toString();
     }
 
-    public boolean dependBlockWhiteListContains(Block block) {
-        return dependBlockWhiteList.contains(block);
+    public boolean dependBlockWhitelistContains(Block block) {
+        return dependBlockWhitelist.contains(block);
     }
 
-    public boolean dependBlockWhiteListContains(Item item) {
-        return dependBlockItemWhiteList.contains(item);
+    public boolean dependBlockWhitelistContains(Item item) {
+        return dependBlockItemWhitelist.contains(item);
     }
 
-    public boolean dependBlockWhiteListAdd(Block block) {
-        boolean result = dependBlockWhiteList.add(block);
+    public boolean dependBlockWhitelistAdd(Block block) {
+        boolean result = dependBlockWhitelist.add(block);
         if (result) {
             Item item = block.asItem();
             if (item != Items.AIR) {
-                dependBlockItemWhiteList.add(item);
+                dependBlockItemWhitelist.add(item);
             }
         }
         return result;
     }
 
-    public boolean dependBlockWhiteListRemove(Block block) {
-        boolean result = dependBlockWhiteList.remove(block);
+    public boolean dependBlockWhitelistRemove(Block block) {
+        boolean result = dependBlockWhitelist.remove(block);
         if (result) {
             Item item = block.asItem();
             if (item != Items.AIR) {
-                dependBlockItemWhiteList.remove(item);
+                dependBlockItemWhitelist.remove(item);
             }
         }
         return result;
@@ -73,9 +73,9 @@ public class Config {
 
     public static Config createDefaultConfig() {
         final Config config = new Config();
-        config.blockWhiteList.addAll(getDefaultBlockWhitelist());
+        config.blockWhitelist.addAll(getDefaultBlockWhitelist());
         for (Block block : getDefaultDependBlockWhitelist()) {
-            config.dependBlockWhiteListAdd(block);
+            config.dependBlockWhitelistAdd(block);
         }
         return config;
     }
@@ -153,7 +153,7 @@ public class Config {
             final Identifier defaultId = Registries.BLOCK.getDefaultId();
             {
                 out.name("whitelist").beginArray();
-                for (Block block : config.blockWhiteList) {
+                for (Block block : config.blockWhitelist) {
                     Identifier id = Registries.BLOCK.getId(block);
                     if (id != defaultId) {
                         out.value(id.toString());
@@ -163,7 +163,7 @@ public class Config {
             }
             {
                 out.name("depend-block-whitelist").beginArray();
-                for (Block block : config.dependBlockWhiteList) {
+                for (Block block : config.dependBlockWhitelist) {
                     Identifier id = Registries.BLOCK.getId(block);
                     if (id != defaultId) {
                         out.value(id.toString());
@@ -201,7 +201,7 @@ public class Config {
                                 Optional<Reference<Block>> entry = Registries.BLOCK.getEntry(Identifier.of(id));
                                 if (entry.isPresent()) {
                                     Reference<Block> block = entry.get();
-                                    if (!config.blockWhiteList.add(block.value())) {
+                                    if (!config.blockWhitelist.add(block.value())) {
                                         BlockMinerMod.LOGGER.debug("Duplicate block during config loading: {}", id);
                                     }
                                 } else {
@@ -218,7 +218,7 @@ public class Config {
                                 Optional<Reference<Block>> entry = Registries.BLOCK.getEntry(Identifier.of(id));
                                 if (entry.isPresent()) {
                                     Reference<Block> block = entry.get();
-                                    if (!config.dependBlockWhiteListAdd(block.value())) {
+                                    if (!config.dependBlockWhitelistAdd(block.value())) {
                                         BlockMinerMod.LOGGER.debug("Duplicate block during config loading: {}", id);
                                     }
                                 } else {
