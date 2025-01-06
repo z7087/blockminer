@@ -43,7 +43,7 @@ jobs:
       - name: 1.21.1 Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: BlockMiner
+          name: BlockMiner-1.21.1
           path: 1.21.1/build/libs/*.jar
 
       - name: 1.21.3 Build with Gradle Wrapper
@@ -52,7 +52,7 @@ jobs:
       - name: 1.21.3 Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: BlockMiner
+          name: BlockMiner-1.21.3
           path: 1.21.3/build/libs/*.jar
 
       - name: 1.21.4 Build with Gradle Wrapper
@@ -61,5 +61,5 @@ jobs:
       - name: 1.21.4 Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: BlockMiner
+          name: BlockMiner-1.21.4
           path: 1.21.4/build/libs/*.jar
