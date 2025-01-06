@@ -37,11 +37,29 @@ jobs:
       - name: Set executable permission for gradlew
         run: chmod +x ./gradlew
 
-      - name: Build with Gradle Wrapper
-        run: ./gradlew build
+      - name: 1.21.1 Build with Gradle Wrapper
+        run: ./gradlew :1.21.1:build
 
-      - name: Upload artifacts
+      - name: 1.21.1 Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: BlockMiner
-          path: build/libs/*.jar
+          path: 1.21.1/build/libs/*.jar
+
+      - name: 1.21.3 Build with Gradle Wrapper
+        run: ./gradlew :1.21.3:build
+
+      - name: 1.21.3 Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: BlockMiner
+          path: 1.21.3/build/libs/*.jar
+
+      - name: 1.21.4 Build with Gradle Wrapper
+        run: ./gradlew :1.21.4:build
+
+      - name: 1.21.4 Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: BlockMiner
+          path: 1.21.4/build/libs/*.jar

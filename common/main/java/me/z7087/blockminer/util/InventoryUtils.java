@@ -1,5 +1,6 @@
 package me.z7087.blockminer.util;
 
+import me.z7087.blockminer.multiversion.EntityAttributesImpl;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
@@ -199,10 +200,10 @@ public final class InventoryUtils {
                 }
             }
         }
+        f *= (float) player.getAttributeValue(EntityAttributesImpl.BLOCK_BREAK_SPEED);
         // 如果玩家在水中并且没有"水下速掘"附魔，则减缓破坏速度
-        f *= (float) player.getAttributeValue(EntityAttributes.BLOCK_BREAK_SPEED);
         if (player.isSubmergedIn(FluidTags.WATER)) {
-            EntityAttributeInstance submergedMiningSpeed = player.getAttributeInstance(EntityAttributes.SUBMERGED_MINING_SPEED);
+            EntityAttributeInstance submergedMiningSpeed = player.getAttributeInstance(EntityAttributesImpl.SUBMERGED_MINING_SPEED);
             if (submergedMiningSpeed != null) {
                 f *= (float) submergedMiningSpeed.getValue();
             }

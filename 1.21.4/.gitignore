@@ -1,0 +1,5 @@
+# 项目排除路径
+/.gradle/
+/.idea/
+/build/
+/run/

@@ -72,6 +72,11 @@ java {
     //withSourcesJar()
 }
 
+sourceSets {
+    main.java.srcDirs += '../common/main/java/'
+    main.resources.srcDirs += '../common/main/resources/'
+}
+
 jar {
     from("LICENSE") {
         rename { "${it}_${project.archivesBaseName}" }
