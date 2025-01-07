@@ -112,10 +112,13 @@ public class Task implements Comparable<Task> {
                             break loop;
                         for (PistonPowerInfo pistonPowerInfo : pistonPowerInfos) {
                             this.pistonPowerInfo = pistonPowerInfo;
+                            final BlockPos dependBlockPos;
                             if (player.canInteractWithBlockAt(pistonPowerInfo.pistonPos, 1)
                                     && player.canInteractWithBlockAt(pistonPowerInfo.powerBlockPos, 1)
-                                    && player.canInteractWithBlockAt(pistonPowerInfo.powerBlockPos.offset(pistonPowerInfo.powerBlockFace.getOpposite()), 1)
-                                    && world.canPlace(Blocks.STONE.getDefaultState(), pistonPowerInfo.pistonPos, ShapeContext.absent())) {
+                                    && player.canInteractWithBlockAt((dependBlockPos = pistonPowerInfo.powerBlockPos.offset(pistonPowerInfo.powerBlockFace.getOpposite())), 1)
+                                    && world.canPlace(Blocks.STONE.getDefaultState(), pistonPowerInfo.pistonPos, ShapeContext.absent())
+                                    // 当依赖方块是目标方块时，无法创建无头活塞
+                                    && (!BlockMinerMod.INSTANCE.config.headlessPistonMode || !dependBlockPos.equals(targetPos))) {
                                 // 朝上下的活塞的朝向可以立即到位，其他方向的不行
                                 switch (pistonPowerInfo.pistonFace) {
                                     case UP:
