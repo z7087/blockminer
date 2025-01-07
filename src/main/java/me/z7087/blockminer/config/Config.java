@@ -30,6 +30,7 @@ public class Config {
                 .create();
     }
     public boolean debug = false;
+    public boolean headlessPistonMode = false;
     public boolean hello = true;
     public int pingSpikeThreshold = 0;
     public PowerBlockType powerBlockUsage = PowerBlockType.Both;
@@ -149,6 +150,7 @@ public class Config {
         public void write(JsonWriter out, Config config) throws IOException {
             out.beginObject();
             out.name("debug").value(config.debug);
+            out.name("headless-piston-mode").value(config.headlessPistonMode);
             if (!config.hello)
                 out.name("hello").value(config.hello);
             out.name("ping-spike-threshold").value(config.pingSpikeThreshold);
@@ -187,6 +189,10 @@ public class Config {
                     switch (name) {
                         case "debug": {
                             config.debug = in.nextBoolean();
+                            break;
+                        }
+                        case "headless-piston-mode": {
+                            config.headlessPistonMode = in.nextBoolean();
                             break;
                         }
                         case "hello": {

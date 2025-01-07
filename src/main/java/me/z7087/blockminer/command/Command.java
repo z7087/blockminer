@@ -69,6 +69,25 @@ public final class Command {
                                                 return 0;
                                             })
                             )
+                    ).then(literal("headless-piston-mode")
+                            .executes((context) -> {
+                                context.getSource().sendFeedback(Text.literal(String.valueOf(BlockMinerMod.INSTANCE.config.headlessPistonMode)));
+                                return 1;
+                            })
+                            .then(
+                                    argument("bool", BoolArgumentType.bool())
+                                            .executes(context -> {
+                                                Config config = BlockMinerMod.INSTANCE.config;
+                                                boolean input = BoolArgumentType.getBool(context, "bool");
+                                                if (config.headlessPistonMode != input) {
+                                                    config.headlessPistonMode = input;
+                                                    BlockMinerMod.INSTANCE.tryToSaveConfig();
+                                                    return 1;
+                                                }
+                                                context.getSource().sendFeedback(Text.literal("headless-piston-mode already set to " + input));
+                                                return 0;
+                                            })
+                            )
                     ).then(literal("ping-spike-threshold")
                             .executes((context) -> {
                                 context.getSource().sendFeedback(Text.literal(String.valueOf(BlockMinerMod.INSTANCE.config.pingSpikeThreshold)));

@@ -71,8 +71,11 @@ public class Task implements Comparable<Task> {
                         }
                         RotationUtils rotationUtils = BlockMinerMod.INSTANCE.rotationUtils;
                         PlayerInventory inventory = player.getInventory();
-                        if ((pistonIndex = InventoryUtils.findFirstItemInHotbar(inventory, Items.PISTON)) == -1
-                        ) {
+                        pistonIndex = InventoryUtils.findFirstItemInHotbar(inventory, Items.PISTON);
+                        if (pistonIndex == -1 && BlockMinerMod.INSTANCE.config.headlessPistonMode) {
+                            pistonIndex = InventoryUtils.findFirstItemInHotbar(inventory, Items.STICKY_PISTON);
+                        }
+                        if (pistonIndex == -1) {
                             break loop;
                         } else {
                             dependBlockIndex = InventoryUtils.findFirstItemInHotbar(inventory, (stack) -> BlockMinerMod.INSTANCE.config.dependBlockWhitelistContains(stack.getItem()));
@@ -419,6 +422,12 @@ public class Task implements Comparable<Task> {
                             // 太远碰不到拉杆，延后
                             break loop;
                         }
+                        BlockPos dependBlockPos = pistonPowerInfo.powerBlockPos.offset(pistonPowerInfo.powerBlockFace.getOpposite());
+                        if (redstoneTorchIndex != -1 && BlockMinerMod.INSTANCE.config.headlessPistonMode && !player.canInteractWithBlockAt(pistonPowerInfo.powerBlockPos.offset(pistonPowerInfo.powerBlockFace.getOpposite()), 1)) {
+                            BlockMinerMod.INSTANCE.rotationUtils.markKeepRotation();
+                            // 如果是无头活塞模式，且此task使用红石火把，且太远碰不到拉杆依附的方块，延后
+                            break loop;
+                        }
                         if (redstoneTorchIndex != -1) {
                             // 打红石火把
                             interactionManager.attackBlock(pistonPowerInfo.powerBlockPos, Direction.DOWN);
@@ -458,8 +467,6 @@ public class Task implements Comparable<Task> {
                             interactionManager.attackBlock(pistonPowerInfo.pistonPos, Direction.DOWN);
                             if (!world.getBlockState(pistonPowerInfo.pistonPos).isAir())
                                 world.setBlockState(pistonPowerInfo.pistonPos, Blocks.AIR.getDefaultState());
-                            // 不知道这里什么情况 为什么会报错
-                            //assertTrue(world.getBlockState(pistonPowerInfo.pistonPos).isAir());
                         } else {
                             if (world.getBlockState(pistonPowerInfo.pistonPos).getBlock().getHardness() < 0) {
                                 // 怎么回事？byd活塞变基岩了？
@@ -502,6 +509,37 @@ public class Task implements Comparable<Task> {
                                 isMining = false;
                             }
                             break loop;
+                        }
+                        if (BlockMinerMod.INSTANCE.config.headlessPistonMode) {
+                            // 无头活塞模式下的重新放置阶段，先重新激活信号源或先放置活塞都是可以的
+                            // 这里选择先放置活塞
+                            if (redstoneTorchIndex != -1) {
+                                // 重新放置红石火把
+                                InventoryUtils.moveToOffhandDuring(player,
+                                        redstoneTorchIndex,
+                                        () -> interactionManager.interactBlock(player,
+                                                Hand.OFF_HAND,
+                                                new BlockHitResult(
+                                                        Vec3d.of(dependBlockPos),
+                                                        pistonPowerInfo.powerBlockFace,
+                                                        dependBlockPos,
+                                                        false
+                                                )
+                                        )
+                                );
+                            } else {
+                                // 拉拉杆
+                                interactionManager.interactBlock(player,
+                                        Hand.MAIN_HAND,
+                                        new BlockHitResult(
+                                                Vec3d.of(pistonPowerInfo.powerBlockPos),
+                                                pistonPowerInfo.powerBlockFace,
+                                                pistonPowerInfo.powerBlockPos,
+                                                false
+                                        )
+                                );
+                            }
+                            // 不处理了，失败了目标方块就被破掉了
                         }
                         state = TaskState.Finished;
                         break;
