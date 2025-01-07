@@ -198,14 +198,14 @@ public class Task implements Comparable<Task> {
                                 )
                         ) {
                             // 检查失败，重新找
-                            state = TaskState.Start;
+                            retry();
                             break;
                         }
                         if (!player.canInteractWithBlockAt(pistonPowerInfo.pistonPos, 1)
                                 || !player.canInteractWithBlockAt(pistonPowerInfo.powerBlockPos, 1)
                                 || !player.canInteractWithBlockAt(dependBlockPos, 1)) {
                             // 距离不够，重新找
-                            state = TaskState.Start;
+                            retry();
                             break;
                         }
                         // fall down
@@ -214,7 +214,7 @@ public class Task implements Comparable<Task> {
                         ClientPlayerInteractionManager interactionManager = Objects.requireNonNull(MinecraftClient.getInstance().interactionManager);
                         RotationUtils rotationUtils = BlockMinerMod.INSTANCE.rotationUtils;
                         if (player.currentScreenHandler != player.playerScreenHandler) {
-                            state = TaskState.Start;
+                            retry();
                             break loop;
                         }
                         {
@@ -237,7 +237,7 @@ public class Task implements Comparable<Task> {
                             );
                             // 放不了，怎么回事呢？重来一遍
                             if (!result.isAccepted()) {
-                                state = TaskState.Start;
+                                retry();
                                 break loop;
                             }
                         }
@@ -245,7 +245,7 @@ public class Task implements Comparable<Task> {
                         if (world.getBlockState(dependBlockPos).isReplaceable()) {
                             if (dependBlockIndex == -1) {
                                 // 本来那有个方块但消失了，手里又没有粘液块，回去重找
-                                state = TaskState.Start;
+                                retry();
                                 break loop;
                             }
                             // 凭空放置
@@ -372,7 +372,7 @@ public class Task implements Comparable<Task> {
                         if (blockBreakingDelta < 1) {
                             if (blockBreakingDelta < 0.7 && redstoneTorchIndex != -1) {
                                 // 挖得太慢了，破不了，回去重试
-                                state = TaskState.Start;
+                                retry();
                                 break loop;
                             }
                             if (player.canInteractWithBlockAt(pistonPowerInfo.pistonPos, 1) && !BlockMinerMod.INSTANCE.blockBreakUtils.isModBreakingBlock()) {
@@ -444,11 +444,7 @@ public class Task implements Comparable<Task> {
                             );
                             if (!result.isAccepted()) {
                                 // 为什么失败了？
-                                state = TaskState.Start;
-                                if (isMining) {
-                                    BlockMinerMod.INSTANCE.blockBreakUtils.setBreaking(false);
-                                    isMining = false;
-                                }
+                                retry();
                                 break loop;
                             }
                         }
@@ -456,12 +452,7 @@ public class Task implements Comparable<Task> {
                             float blockBreakingDeltaNow = InventoryUtils.calcBlockBreakingDelta(player, Blocks.PISTON.getDefaultState(), player.getMainHandStack());
                             if (blockBreakingDeltaNow < 1) {
                                 // 之前能秒破活塞但现在不能了，回去
-                                state = TaskState.Start;
-                                if (isMining) {
-                                    BlockMinerMod.INSTANCE.blockBreakUtils.setBreaking(false);
-                                    interactionManager.cancelBlockBreaking();
-                                    isMining = false;
-                                }
+                                retry();
                                 break loop;
                             }
                             interactionManager.attackBlock(pistonPowerInfo.pistonPos, Direction.DOWN);
@@ -470,12 +461,7 @@ public class Task implements Comparable<Task> {
                         } else {
                             if (world.getBlockState(pistonPowerInfo.pistonPos).getBlock().getHardness() < 0) {
                                 // 怎么回事？byd活塞变基岩了？
-                                state = TaskState.Start;
-                                if (isMining) {
-                                    BlockMinerMod.INSTANCE.blockBreakUtils.setBreaking(false);
-                                    interactionManager.cancelBlockBreaking();
-                                    isMining = false;
-                                }
+                                retry();
                                 break loop;
                             }
                             ClientPlayerInteractionManagerAccessor interactionManagerAccessor = (ClientPlayerInteractionManagerAccessor) interactionManager;
@@ -502,12 +488,7 @@ public class Task implements Comparable<Task> {
                         );
                         if (!result.isAccepted()) {
                             // ?????
-                            state = TaskState.Start;
-                            if (isMining) {
-                                BlockMinerMod.INSTANCE.blockBreakUtils.setBreaking(false);
-                                interactionManager.cancelBlockBreaking();
-                                isMining = false;
-                            }
+                            retry();
                             break loop;
                         }
                         if (BlockMinerMod.INSTANCE.config.headlessPistonMode) {
@@ -552,6 +533,15 @@ public class Task implements Comparable<Task> {
             }
         }
         return false;
+    }
+
+    private void retry() {
+        state = TaskState.Start;
+        if (isMining) {
+            BlockMinerMod.INSTANCE.blockBreakUtils.setBreaking(false);
+            Objects.requireNonNull(MinecraftClient.getInstance().interactionManager).cancelBlockBreaking();
+            isMining = false;
+        }
     }
 
     private static void assertTrue(boolean result) {
