@@ -49,6 +49,12 @@ public final class Command {
                                         }
                                         return 1;
                                     })
+                            ).then(literal("reset")
+                                    .executes(context -> {
+                                        BlockMinerMod.INSTANCE.config = Config.createDefaultConfig();
+                                        BlockMinerMod.INSTANCE.tryToSaveConfig();
+                                        return 1;
+                                    })
                             )
                     ).then(literal("debug")
                             .executes((context) -> {
