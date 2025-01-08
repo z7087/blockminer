@@ -472,6 +472,42 @@ public class Task implements Comparable<Task> {
                                 interactionManager.updateBlockBreakingProgress(pistonPowerInfo.pistonPos, Direction.DOWN);
                             BlockMinerMod.INSTANCE.blockBreakUtils.setBreaking(false);
                         }
+                        if (BlockMinerMod.INSTANCE.config.headlessPistonMode) {
+                            // 无头活塞模式下的重新放置阶段，先重新激活信号源或先放置活塞都是可以的
+                            // 但先放置活塞的话目标方块可能被意外破掉，所以这里选择先重新激活信号源
+                            ActionResult result;
+                            if (redstoneTorchIndex != -1) {
+                                // 重新放置红石火把
+                                result = InventoryUtils.moveToOffhandDuring(player,
+                                        redstoneTorchIndex,
+                                        () -> interactionManager.interactBlock(player,
+                                                Hand.OFF_HAND,
+                                                new BlockHitResult(
+                                                        Vec3d.of(dependBlockPos),
+                                                        pistonPowerInfo.powerBlockFace,
+                                                        dependBlockPos,
+                                                        false
+                                                )
+                                        )
+                                );
+                            } else {
+                                // 拉拉杆
+                                result = interactionManager.interactBlock(player,
+                                        Hand.MAIN_HAND,
+                                        new BlockHitResult(
+                                                Vec3d.of(pistonPowerInfo.powerBlockPos),
+                                                pistonPowerInfo.powerBlockFace,
+                                                pistonPowerInfo.powerBlockPos,
+                                                false
+                                        )
+                                );
+                            }
+                            if (!result.isAccepted()) {
+                                // 重新激活信号源失败了，回去重试
+                                retry();
+                                break loop;
+                            }
+                        }
                         // 重新凭空放置活塞
                         ActionResult result = InventoryUtils.moveToOffhandDuring(
                                 player,
@@ -493,37 +529,6 @@ public class Task implements Comparable<Task> {
                             // ?????
                             retry();
                             break loop;
-                        }
-                        if (BlockMinerMod.INSTANCE.config.headlessPistonMode) {
-                            // 无头活塞模式下的重新放置阶段，先重新激活信号源或先放置活塞都是可以的
-                            // 这里选择先放置活塞
-                            if (redstoneTorchIndex != -1) {
-                                // 重新放置红石火把
-                                InventoryUtils.moveToOffhandDuring(player,
-                                        redstoneTorchIndex,
-                                        () -> interactionManager.interactBlock(player,
-                                                Hand.OFF_HAND,
-                                                new BlockHitResult(
-                                                        Vec3d.of(dependBlockPos),
-                                                        pistonPowerInfo.powerBlockFace,
-                                                        dependBlockPos,
-                                                        false
-                                                )
-                                        )
-                                );
-                            } else {
-                                // 拉拉杆
-                                interactionManager.interactBlock(player,
-                                        Hand.MAIN_HAND,
-                                        new BlockHitResult(
-                                                Vec3d.of(pistonPowerInfo.powerBlockPos),
-                                                pistonPowerInfo.powerBlockFace,
-                                                pistonPowerInfo.powerBlockPos,
-                                                false
-                                        )
-                                );
-                            }
-                            // 不处理了，失败了目标方块就被破掉了
                         }
                         state = TaskState.Finished;
                         break;
