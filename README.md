@@ -33,12 +33,16 @@
 
 ### [As_One_](https://space.bilibili.com/259168987)
 
-[【我的世界】丐😍中😍丐破基🐔岩](https://www.bilibili.com/video/BV13e4y1m7s1) 视频启发了我
+[【我的世界】丐😍中😍丐破基🐔岩](https://www.bilibili.com/video/BV13e4y1m7s1) 视频提出了使用拉杆代替红石火把破基岩
 
 ### [Bunny_i](https://github.com/bunnyi116)
 
 [Fabric-Bedrock-Miner 分支](https://github.com/bunnyi116/fabric-bedrock-miner)维护者 模组开发前和期间和我讨论了去信标破基岩的可行性 对我提供了技术上的帮助
 
-### Fabric工具链开发者
+### [Fallen_Breath](https://github.com/Fallen-Breath)
 
-略 readme好难写 对不起
+[fabric-mod-template](https://github.com/Fallen-Breath/fabric-mod-template)教会我如何配置[preprocessor](https://github.com/ReplayMod/preprocessor) 我没找到它的文档
+
+### [Fabric](https://fabricmc.net)工具链开发者
+
+\-
