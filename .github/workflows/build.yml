@@ -38,10 +38,10 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Build with Gradle Wrapper
-        run: ./gradlew build
+        run: ./gradlew buildAndGather
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: BlockMiner
+          name: BlockMiner-all
           path: build/libs/*.jar
