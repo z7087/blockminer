@@ -6,7 +6,6 @@ import me.z7087.blockminer.util.enums.PowerBlockType;
 import net.minecraft.block.*;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
-import net.minecraft.world.RedstoneView;
 import net.minecraft.world.World;
 
 import java.util.LinkedHashMap;
@@ -40,14 +39,14 @@ public final class BlockFinder {
             final Direction back = DIRECTIONS[i];
             final BlockPos pistonPos = targetPos.offset(back);
             if (world.isInBuildLimit(pistonPos)
-                    && world.getBlockState(pistonPos).isReplaceable()
+                    && BlockUtils.isReplaceable(world.getBlockState(pistonPos))
                     && world.canPlace(stoneState, pistonPos, ShapeContext.absent())
             ) {
                 for (int j = 0; j < length; ++j) {
                     final Direction face = POSSIBLE_FACE_DIRECTIONS[i][j];
                     final BlockPos pistonHeadPos = pistonPos.offset(face);
                     if (world.isInBuildLimit(pistonHeadPos)
-                            && world.getBlockState(pistonHeadPos).isReplaceable()
+                            && BlockUtils.isReplaceable(world.getBlockState(pistonHeadPos))
                             && isPistonPlaceSafe(world, pistonPos, face)
                     ) {
                         possiblePistonLocations.add(Pair.of(pistonPos, face));
@@ -57,7 +56,7 @@ public final class BlockFinder {
         }
     }
 
-    public static boolean isPistonPlaceSafe(RedstoneView world, BlockPos pistonPos, Direction face) {
+    public static boolean isPistonPlaceSafe(World world, BlockPos pistonPos, Direction face) {
         for (Direction direction : POSSIBLE_FACE_DIRECTIONS[face.getOpposite().ordinal()]) {
             if (world.isEmittingRedstonePower(pistonPos.offset(direction), direction)) {
                 return false;
@@ -110,7 +109,7 @@ public final class BlockFinder {
                 && world.isInBuildLimit(powerBlockPos)
         ) {
             BlockState state = world.getBlockState(powerBlockPos);
-            if (state.isReplaceable()) {
+            if (BlockUtils.isReplaceable(state)) {
                 for (Direction dependDirection : DIRECTIONS) {
                     BlockPos dependBlockPos = powerBlockPos.offset(dependDirection);
                     if (!dependBlockPos.equals(pistonPos)
@@ -125,7 +124,7 @@ public final class BlockFinder {
                     if (!actualPowerBlockPos.equals(pistonPos)
                             && !actualPowerBlockPos.equals(pistonHeadPos)
                             && world.isInBuildLimit(actualPowerBlockPos)
-                            && world.getBlockState(actualPowerBlockPos).isReplaceable()
+                            && BlockUtils.isReplaceable(world.getBlockState(actualPowerBlockPos))
                     ) {
                         findPowerBlockForPistonInternal2(deduplicationMapSolidDependBlock, deduplicationMapReplaceableDependBlock, world, dependDirection.getOpposite(), powerBlockPos, false, actualPowerBlockPos, isLever, pistonPos, pistonFace);
                     }
@@ -136,7 +135,7 @@ public final class BlockFinder {
 
     private static void findPowerBlockForPistonInternal2(Map<PistonPowerInfo, PistonPowerInfo> deduplicationMapSolidDependBlock, Map<PistonPowerInfo, PistonPowerInfo> deduplicationMapReplaceableDependBlock, World world, Direction dependDirection, BlockPos dependBlockPos, boolean isRedstoneTorch, BlockPos powerBlockPos, boolean isLever, BlockPos pistonPos, Direction pistonFace) {
         BlockState dependBlockState = world.getBlockState(dependBlockPos);
-        final boolean dependBlockIsReplaceable = dependBlockState.isReplaceable();
+        final boolean dependBlockIsReplaceable = BlockUtils.isReplaceable(dependBlockState);
         if ((dependBlockIsReplaceable && world.canPlace(Blocks.STONE.getDefaultState(), dependBlockPos, ShapeContext.absent())) || (Block.sideCoversSmallSquare(world, dependBlockPos, dependDirection.getOpposite()) && !(dependBlockState.getBlock() instanceof PistonBlock))) {
             boolean redstoneTorch = false;
             boolean lever = false;

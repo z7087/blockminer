@@ -6,14 +6,33 @@ import me.z7087.blockminer.task.TaskManager;
 import me.z7087.blockminer.util.BlockBreakUtils;
 import me.z7087.blockminer.util.RotationUtils;
 import net.fabricmc.api.ClientModInitializer;
+//#if MC >= 11802
+import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+//#else
+//$$ import org.apache.logging.log4j.LogManager;
+//$$ import org.apache.logging.log4j.Logger;
+//#endif
+
+//#if MC >= 11900
+import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
+//#else
+//$$ import net.fabricmc.fabric.api.client.command.v1.ClientCommandManager;
+//#endif
 
 import java.io.IOException;
 
 public final class BlockMinerMod implements ClientModInitializer {
     public static final String MOD_ID = "blockminer";
-    public static final Logger LOGGER = LoggerFactory.getLogger(BlockMinerMod.class);
+    public static final String HELLO_MESSAGE = "fabric:" + MOD_ID + ":hello";
+    public static final Logger LOGGER;
+    static {
+        //#if MC >= 11802
+        LOGGER = LogUtils.getLogger();
+        //#else
+        //$$ LOGGER = LogManager.getLogger();
+        //#endif
+    }
     public static BlockMinerMod INSTANCE;
     public Config config = Config.createDefaultConfig();
     public final TaskManager taskManager = new TaskManager();
@@ -31,7 +50,7 @@ public final class BlockMinerMod implements ClientModInitializer {
             config = tconfig;
         boolean hasFabricCommandApi = true;
         try {
-            Class<?> ignored = net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.class;
+            Class<?> ignored = ClientCommandManager.class;
         } catch (NoClassDefFoundError e) {
             hasFabricCommandApi = false;
         }

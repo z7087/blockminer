@@ -10,12 +10,19 @@ plugins {
 preprocess {
     strictExtraMappings = false
 
-    def mc_1_14_4  = createNode('1.14.4', 1_14_04, '')
-    def mc_1_15_2  = createNode('1.15.2', 1_15_02, '')
+//    def mc_1_14_4  = createNode('1.14.4', 1_14_04, '')
+//    def mc_1_15_2  = createNode('1.15.2', 1_15_02, '')
     def mc_1_16_5  = createNode('1.16.5', 1_16_05, '')
+    def mc_1_17  = createNode('1.17', 1_17_00, '')
     def mc_1_17_1  = createNode('1.17.1', 1_17_01, '')
+    def mc_1_18_1  = createNode('1.18.1', 1_18_01, '')
     def mc_1_18_2  = createNode('1.18.2', 1_18_02, '')
+    def mc_1_19  = createNode('1.19', 1_19_00, '')
+    def mc_1_19_2  = createNode('1.19.2', 1_19_02, '')
+    def mc_1_19_3  = createNode('1.19.3', 1_19_03, '')
     def mc_1_19_4  = createNode('1.19.4', 1_19_04, '')
+    def mc_1_20_1 = createNode('1.20.1', 1_20_01, '')
+    def mc_1_20_2 = createNode('1.20.2', 1_20_02, '')
     def mc_1_20_4 = createNode('1.20.4', 1_20_04, '')
     def mc_1_20_6 = createNode('1.20.6', 1_20_06, '')
     def mc_1_21_1 = createNode('1.21.1', 1_21_01, '')
@@ -23,18 +30,26 @@ preprocess {
     def mc_1_21_4 = createNode('1.21.4', 1_21_04, '')
 
     // back
-    mc_1_18_2.link(mc_1_17_1 , null)
+    mc_1_21_4.link(mc_1_21_3, null)
+    mc_1_21_3.link(mc_1_21_1, null)
+    mc_1_21_1.link(mc_1_20_6, null)
+    mc_1_20_6.link(mc_1_20_4, null)
+    mc_1_20_4.link(mc_1_20_2, null)
+    mc_1_20_2.link(mc_1_20_1, null)
+    mc_1_20_1.link(mc_1_19_4, null)
+    mc_1_19_4.link(mc_1_19_3, null)
+    mc_1_19_3.link(mc_1_19_2, file("versions/mapping-1.19.3-1.19.2.txt"))
+    mc_1_19_2.link(mc_1_19, null)
+    mc_1_19.link(mc_1_18_2, file("versions/mapping-1.19-1.18.2.txt"))
+    mc_1_18_2.link(mc_1_18_1, null)
+    mc_1_18_1.link(mc_1_17_1 , null)
+    mc_1_17_1.link(mc_1_17 , null)
     mc_1_17_1.link(mc_1_16_5 , null)
-    mc_1_16_5.link(mc_1_15_2 , null)
-    mc_1_15_2.link(mc_1_14_4 , null)
+//    mc_1_16_5.link(mc_1_15_2 , null)
+//    mc_1_15_2.link(mc_1_14_4 , null)
 
     // forward
-    mc_1_18_2.link(mc_1_19_4 , null)
-    mc_1_19_4.link(mc_1_20_4, null)
-    mc_1_20_4.link(mc_1_20_6, null)
-    mc_1_20_6.link(mc_1_21_1, null)
-    mc_1_21_1.link(mc_1_21_3, null)
-    mc_1_21_3.link(mc_1_21_4, null)
+    // nope.
 }
 
 tasks.register('buildAndGather') {

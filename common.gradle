@@ -31,19 +31,18 @@ dependencies {
 
     // dependencies
     Set<String> apiModules = [
-            "fabric-command-api-v2",
+            mcVersion >= 1_19_00 ? "fabric-command-api-v2" : "fabric-command-api-v1",
             "fabric-resource-loader-v0"
     ]
     // Add each module as a dependency
     apiModules.forEach {
-        modImplementation(fabricApi.module(it, project.fabric_version))
+        modImplementation(fabricApi.module(it, project.fabric_api_version))
     }
 //	include(modImplementation(fabricApi.module("fabric-resource-loader-v0", project.fabric_api_version)))
 //	include(modImplementation("me.fallenbreath:conditional-mixin-fabric:${project.conditionalmixin_version}"))
 //	include(annotationProcessor(implementation("io.github.llamalad7:mixinextras-fabric:${project.mixinextras_version}")))
 }
 
-String MIXIN_CONFIG_PATH = 'template_mod.mixins.json'
 JavaVersion JAVA_COMPATIBILITY
 if (mcVersion >= 12005) {
     JAVA_COMPATIBILITY = JavaVersion.VERSION_21
@@ -111,7 +110,7 @@ processResources {
         expand valueMap
     }
 
-    filesMatching(MIXIN_CONFIG_PATH) {
+    filesMatching("blockminer.mixins.json") {
         filter { s -> s.replace('{{COMPATIBILITY_LEVEL}}', "JAVA_${MIXIN_COMPATIBILITY_LEVEL.ordinal() + 1}") }
     }
 }

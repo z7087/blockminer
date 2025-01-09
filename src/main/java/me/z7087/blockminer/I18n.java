@@ -5,8 +5,16 @@ import net.minecraft.text.Text;
 public final class I18n {
     private I18n() {}
 
-    public static final Text TOGGLE_ON = Text.translatable("blockminer.toggle.on");
-    public static final Text TOGGLE_OFF = Text.translatable("blockminer.toggle.off");
+    private static Text ofTranslatable(String key) {
+        //#if MC >= 11900
+        return Text.translatable(key);
+        //#else
+        //$$ return new net.minecraft.text.TranslatableText(key);
+        //#endif
+    }
 
-    public static final Text WARN_MULTIPLAYER = Text.translatable("blockminer.warn.multiplayer");
+    public static final Text TOGGLE_ON = ofTranslatable("blockminer.toggle.on");
+    public static final Text TOGGLE_OFF = ofTranslatable("blockminer.toggle.off");
+
+    public static final Text WARN_MULTIPLAYER = ofTranslatable("blockminer.warn.multiplayer");
 }

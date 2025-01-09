@@ -9,28 +9,57 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 
 @Mixin(ClientPlayerEntity.class)
 public abstract class MixinClientPlayerEntity {
+    //#if MC >= 11700
     @Redirect(method = "sendMovementPackets",
             at = @At(
                     value = "INVOKE",
                     target = "Lnet/minecraft/client/network/ClientPlayerEntity;getYaw()F"
             )
     )
+    //#else
+    //$$ @Redirect(method = "sendMovementPackets",
+    //$$         at = @At(
+    //$$                 value = "FIELD",
+    //$$                 target = "Lnet/minecraft/client/network/ClientPlayerEntity;yaw:F",
+    //$$                 opcode = org.objectweb.asm.Opcodes.GETFIELD
+    //$$         )
+    //$$ )
+    //#endif
     private float onGetYaw(ClientPlayerEntity player) {
         Rotation rotation = BlockMinerMod.INSTANCE.rotationUtils.getRotation();
         if (rotation.hasYaw())
             return rotation.getYaw();
+        //#if MC >= 11700
         return player.getYaw();
+        //#else
+        //$$ return player.yaw;
+        //#endif
     }
+
+    //#if MC >= 11700
     @Redirect(method = "sendMovementPackets",
             at = @At(
                     value = "INVOKE",
                     target = "Lnet/minecraft/client/network/ClientPlayerEntity;getPitch()F"
             )
     )
+    //#else
+    //$$ @Redirect(method = "sendMovementPackets",
+    //$$         at = @At(
+    //$$                 value = "FIELD",
+    //$$                 target = "Lnet/minecraft/client/network/ClientPlayerEntity;yaw:F",
+    //$$                 opcode = org.objectweb.asm.Opcodes.PUTFIELD
+    //$$         )
+    //$$ )
+    //#endif
     private float onGetPitch(ClientPlayerEntity player) {
         Rotation rotation = BlockMinerMod.INSTANCE.rotationUtils.getRotation();
         if (rotation.hasPitch())
             return rotation.getPitch();
+        //#if MC >= 11700
         return player.getPitch();
+        //#else
+        //$$ return player.pitch;
+        //#endif
     }
 }

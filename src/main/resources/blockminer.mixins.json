@@ -2,7 +2,7 @@
   "required": true,
   "minVersion": "0.8",
   "package": "me.z7087.blockminer.mixin",
-  "compatibilityLevel": "JAVA_17",
+  "compatibilityLevel": "{{COMPATIBILITY_LEVEL}}",
   "mixins": [
     "MixinClientLoginNetworkHandler"
   ],

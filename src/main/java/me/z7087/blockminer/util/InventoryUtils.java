@@ -1,5 +1,6 @@
 package me.z7087.blockminer.util;
 
+import net.minecraft.block.BambooBlock;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
@@ -14,20 +15,25 @@ import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.item.SwordItem;
 import net.minecraft.registry.tag.FluidTags;
-import net.minecraft.screen.PlayerScreenHandler;
 import net.minecraft.screen.slot.SlotActionType;
 import net.minecraft.util.collection.DefaultedList;
 
 import java.util.Comparator;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 public final class InventoryUtils {
+    private static final int HOTBAR_START =
+            //#if MC >= 11700
+            net.minecraft.screen.PlayerScreenHandler.HOTBAR_START
+            //#else
+            //$$ 36
+            //#endif
+    ;
+
     private InventoryUtils() {}
 
     public static int findFirstItemInHotbar(PlayerInventory inventory, Item item) {
@@ -133,9 +139,9 @@ public final class InventoryUtils {
         if (hotbarSlot < 0 || hotbarSlot > 8)
             throw new IllegalArgumentException("hotbarSlot is not in 0~8 range");
         ClientPlayerInteractionManager interactionManager = Objects.requireNonNull(MinecraftClient.getInstance().interactionManager);
-        interactionManager.clickSlot(0, hotbarSlot + PlayerScreenHandler.HOTBAR_START, 40, SlotActionType.SWAP, player);
+        interactionManager.clickSlot(0, hotbarSlot + HOTBAR_START, 40, SlotActionType.SWAP, player);
         T result = supplier.get();
-        interactionManager.clickSlot(0, hotbarSlot + PlayerScreenHandler.HOTBAR_START, 40, SlotActionType.SWAP, player);
+        interactionManager.clickSlot(0, hotbarSlot + HOTBAR_START, 40, SlotActionType.SWAP, player);
         return result;
     }
 
@@ -147,11 +153,15 @@ public final class InventoryUtils {
      * @return 当前物品每tick破坏该方块的百分比
      */
     public static float calcBlockBreakingDelta(ClientPlayerEntity player, BlockState blockState, ItemStack itemStack) {
-        float hardness = blockState.getBlock().getHardness();
+        // 硬编码的
+        if (itemStack.getItem() instanceof SwordItem && blockState.getBlock() instanceof BambooBlock) {
+            return 1F;
+        }
+        float hardness = BlockUtils.getHardness(blockState);
         if (hardness < 0)
             return 0;
         final int i;
-        if (!blockState.isToolRequired() || player.getInventory().getMainHandStack().isSuitableFor(blockState)) {
+        if (!blockState.isToolRequired() || itemStack.isSuitableFor(blockState)) {
             i = 30;
         } else {
             i = 100;
@@ -160,18 +170,20 @@ public final class InventoryUtils {
         // 根据工具的"效率"附魔增加破坏速度
         if (f > 1.0F) {
             // 获取itemStack的附魔集合
-            for (RegistryEntry<Enchantment> enchantment : itemStack.getEnchantments().getEnchantments()) {
-                Optional<RegistryKey<Enchantment>> enchantmentKey = enchantment.getKey();
-                if (enchantmentKey.isPresent()) {
-                    // 获取效率附魔等级
-                    if (enchantmentKey.get() == Enchantments.EFFICIENCY) {
-                        int toolLevel = EnchantmentHelper.getLevel(enchantment, itemStack);
-                        if (toolLevel > 0 && !itemStack.isEmpty()) {
-                            f += (float) (toolLevel * toolLevel + 1);
-                        }
-                        break;
-                    }
+            int toolLevel = -1;
+            //#if MC >= 12100
+            for (net.minecraft.registry.entry.RegistryEntry<Enchantment> enchantment : itemStack.getEnchantments().getEnchantments()) {
+                //noinspection OptionalGetWithoutIsPresent
+                if (enchantment.getKey().get() == Enchantments.EFFICIENCY) {
+                    toolLevel = EnchantmentHelper.getLevel(enchantment, itemStack);
+                    break;
                 }
+            }
+            //#else
+            //$$ toolLevel = EnchantmentHelper.getLevel(Enchantments.EFFICIENCY, itemStack);
+            //#endif
+            if (toolLevel > 0 && !itemStack.isEmpty()) {
+                f += (float) (toolLevel * toolLevel + 1);
             }
         }
         // 根据玩家"急迫"状态效果增加破坏速度
@@ -181,31 +193,40 @@ public final class InventoryUtils {
 
         // 根据玩家"挖掘疲劳"状态效果减缓破坏速度
         if (player.hasStatusEffect(StatusEffects.MINING_FATIGUE)) {
+            float f2;
             switch (Objects.requireNonNull(player.getStatusEffect(StatusEffects.MINING_FATIGUE)).getAmplifier()) {
                 case 0: {
-                    f *= 0.3F;
+                    f2 = 0.3F;
                     break;
                 }
                 case 1: {
-                    f *= 0.09F;
+                    f2 = 0.09F;
                     break;
                 }
                 case 2: {
-                    f *= 0.0027F;
+                    f2 = 0.0027F;
                     break;
                 }
                 default: {
-                    f *= 8.1E-4F;
+                    f2 = 8.1E-4F;
                 }
             }
+            f *= f2;
         }
-        // 如果玩家在水中并且没有"水下速掘"附魔，则减缓破坏速度
+        //#if MC >= 12006
         f *= (float) player.getAttributeValue(EntityAttributes.BLOCK_BREAK_SPEED);
+        //#endif
+        // 如果玩家在水中并且没有"水下速掘"附魔，则减缓破坏速度
         if (player.isSubmergedIn(FluidTags.WATER)) {
+            //#if MC >= 12100
             EntityAttributeInstance submergedMiningSpeed = player.getAttributeInstance(EntityAttributes.SUBMERGED_MINING_SPEED);
             if (submergedMiningSpeed != null) {
                 f *= (float) submergedMiningSpeed.getValue();
             }
+            //#else
+            //$$ if (!EnchantmentHelper.hasAquaAffinity(player))
+            //$$     f /= 5.0F;
+            //#endif
         }
         // 如果玩家不在地面上，则减缓破坏速度
         if (!player.isOnGround()) {

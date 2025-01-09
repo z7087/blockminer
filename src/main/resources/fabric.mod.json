@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "id": "blockminer",
+  "id": "${id}",
   "version": "${version}",
-  "name": "blockminer",
+  "name": "${name}",
   "description": "Client mod to mine unbreakable blocks",
   "authors": [
     "7087z",
@@ -25,8 +25,8 @@
     "blockminer.mixins.json"
   ],
   "depends": {
-    "fabricloader": ">=${loader_version}",
-    "minecraft": "${compatible_minecraft_version}"
+    "fabricloader": ">=0.11.4",
+    "minecraft": "${minecraft_dependency}"
   },
   "recommends": {
     "fabric-api": "*"

@@ -35,12 +35,21 @@ public abstract class MixinMinecraftClient {
             cir.setReturnValue(true);
     }
 
+    //#if MC >= 11900
     @Redirect(method = "doItemUse", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/network/ClientPlayerInteractionManager;interactBlock(Lnet/minecraft/client/network/ClientPlayerEntity;Lnet/minecraft/util/Hand;Lnet/minecraft/util/hit/BlockHitResult;)Lnet/minecraft/util/ActionResult;"))
     private ActionResult beforeUseOnBlock(ClientPlayerInteractionManager interactionManager, ClientPlayerEntity player, Hand hand, BlockHitResult hitResult) {
         if (hand == Hand.MAIN_HAND && player.getMainHandStack().isEmpty() && BlockMinerMod.INSTANCE.taskManager.handleUseOnBlock(hitResult.getBlockPos()))
             return ActionResult.FAIL;
         return interactionManager.interactBlock(player, hand, hitResult);
     }
+    //#else
+    //$$ @Redirect(method = "doItemUse", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/network/ClientPlayerInteractionManager;interactBlock(Lnet/minecraft/client/network/ClientPlayerEntity;Lnet/minecraft/client/world/ClientWorld;Lnet/minecraft/util/Hand;Lnet/minecraft/util/hit/BlockHitResult;)Lnet/minecraft/util/ActionResult;"))
+    //$$ private ActionResult beforeUseOnBlock(ClientPlayerInteractionManager interactionManager, ClientPlayerEntity player, net.minecraft.client.world.ClientWorld world, Hand hand, BlockHitResult hitResult) {
+    //$$     if (hand == Hand.MAIN_HAND && player.getMainHandStack().isEmpty() && BlockMinerMod.INSTANCE.taskManager.handleUseOnBlock(hitResult.getBlockPos()))
+    //$$         return ActionResult.FAIL;
+    //$$     return interactionManager.interactBlock(player, world, hand, hitResult);
+    //$$ }
+    //#endif
 
     @Inject(method = "handleBlockBreaking", at = @At(value = "FIELD", target = "Lnet/minecraft/client/MinecraftClient;attackCooldown:I", opcode = Opcodes.GETFIELD), cancellable = true)
     private void beforeBlockBreaking(CallbackInfo ci) {

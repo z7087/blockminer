@@ -12,12 +12,10 @@ import net.minecraft.block.Blocks;
 import net.minecraft.item.Item;
 import net.minecraft.item.Items;
 import net.minecraft.registry.Registries;
-import net.minecraft.registry.entry.RegistryEntry.Reference;
 import net.minecraft.util.Identifier;
 
 import java.io.*;
 import java.util.HashSet;
-import java.util.Optional;
 import java.util.Set;
 
 public class Config {
@@ -145,6 +143,14 @@ public class Config {
         return blocks;
     }
 
+    static Identifier identifierOf(String id) {
+        //#if MC >= 12100
+        return Identifier.of(id);
+        //#else
+        //$$ return new Identifier(id);
+        //#endif
+    }
+
     private static final class ConfigTypeAdapter extends TypeAdapter<Config> {
         @Override
         public void write(JsonWriter out, Config config) throws IOException {
@@ -211,10 +217,9 @@ public class Config {
                             in.beginArray();
                             while (in.hasNext()) {
                                 final String id = in.nextString();
-                                Optional<Reference<Block>> entry = Registries.BLOCK.getEntry(Identifier.of(id));
-                                if (entry.isPresent()) {
-                                    Reference<Block> block = entry.get();
-                                    if (!config.blockWhitelist.add(block.value())) {
+                                Block block = Registries.BLOCK.get(identifierOf(id));
+                                if (block != Blocks.AIR) {
+                                    if (!config.blockWhitelist.add(block)) {
                                         BlockMinerMod.LOGGER.debug("Duplicate block during config loading: {}", id);
                                     }
                                 } else {
@@ -228,10 +233,9 @@ public class Config {
                             in.beginArray();
                             while (in.hasNext()) {
                                 final String id = in.nextString();
-                                Optional<Reference<Block>> entry = Registries.BLOCK.getEntry(Identifier.of(id));
-                                if (entry.isPresent()) {
-                                    Reference<Block> block = entry.get();
-                                    if (!config.dependBlockWhitelistAdd(block.value())) {
+                                Block block = Registries.BLOCK.get(identifierOf(id));
+                                if (block != Blocks.AIR) {
+                                    if (!config.dependBlockWhitelistAdd(block)) {
                                         BlockMinerMod.LOGGER.debug("Duplicate block during config loading: {}", id);
                                     }
                                 } else {

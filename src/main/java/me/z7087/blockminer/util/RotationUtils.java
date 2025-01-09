@@ -186,13 +186,25 @@ public final class RotationUtils {
 
     public <T> T useServerSideRotationDuring(ClientPlayerEntity player, Supplier<T> supplier) {
         final ClientPlayerEntityAccessor playerAccessor = (ClientPlayerEntityAccessor) player;
-        float originYaw = player.getYaw();
-        float originPitch = player.getPitch();
+        T result;
+        float originYaw, originPitch;
+        //#if MC >= 11700
+        originYaw = player.getYaw();
+        originPitch = player.getPitch();
         player.setYaw(playerAccessor.getLastYaw());
         player.setPitch(playerAccessor.getLastPitch());
-        T result = supplier.get();
+        result = supplier.get();
         player.setYaw(originYaw);
         player.setPitch(originPitch);
+        //#else
+        //$$ originYaw = player.yaw;
+        //$$ originPitch = player.pitch;
+        //$$ player.yaw = playerAccessor.getLastYaw();
+        //$$ player.pitch = playerAccessor.getLastPitch();
+        //$$ result = supplier.get();
+        //$$ player.yaw = originYaw;
+        //$$ player.pitch = originPitch;
+        //#endif
         return result;
     }
 
