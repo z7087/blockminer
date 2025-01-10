@@ -7,32 +7,23 @@ import net.minecraft.client.network.ClientPlayerInteractionManager;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
 import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.HitResult;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
 import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(MinecraftClient.class)
 public abstract class MixinMinecraftClient {
-    @SuppressWarnings("SpellCheckingInspection")
-    @Shadow
-    public HitResult crosshairTarget;
-
-    @Inject(method = "doAttack", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/network/ClientPlayerInteractionManager;attackBlock(Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/util/math/Direction;)Z"), cancellable = true)
-    private void beforeAttackBlock(CallbackInfoReturnable<Boolean> cir) {
-        if (cir.getReturnValue() != null)
-            return;
-        if (BlockMinerMod.INSTANCE.taskManager.handleAttackBlock(((BlockHitResult) crosshairTarget).getBlockPos())) {
-            cir.setReturnValue(true);
-            return;
-        }
-        if (BlockMinerMod.INSTANCE.blockBreakUtils.isModBreakingBlock())
-            cir.setReturnValue(true);
+    @Redirect(method = "doAttack", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/network/ClientPlayerInteractionManager;attackBlock(Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/util/math/Direction;)Z"))
+    private boolean beforeAttackBlock(ClientPlayerInteractionManager interactionManager, BlockPos pos, Direction direction) {
+        if (BlockMinerMod.INSTANCE.taskManager.handleAttackBlock(pos)
+                || BlockMinerMod.INSTANCE.blockBreakUtils.isModBreakingBlock())
+            return true;
+        return interactionManager.attackBlock(pos, direction);
     }
 
     //#if MC >= 11900
