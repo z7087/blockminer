@@ -5,6 +5,7 @@ import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonWriter;
 import com.google.gson.stream.MalformedJsonException;
 import me.z7087.blockminer.BlockMinerMod;
+import me.z7087.blockminer.util.enums.DistanceCalculationMode;
 import me.z7087.blockminer.util.enums.PowerBlockType;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.block.Block;
@@ -32,6 +33,7 @@ public class Config {
     public boolean hello = true;
     public int pingSpikeThreshold = 0;
     public PowerBlockType powerBlockUsage = PowerBlockType.Both;
+    public DistanceCalculationMode distanceCalculationMode = DistanceCalculationMode.currentClientVersion;
     public final Set<Block> blockWhitelist = new HashSet<>();
 
     private final Set<Block> dependBlockWhitelist = new HashSet<>();
@@ -157,10 +159,12 @@ public class Config {
             out.beginObject();
             out.name("debug").value(config.debug);
             out.name("headless-piston-mode").value(config.headlessPistonMode);
+            // 默认隐藏hello选项，这样用户无法通过正常方式影响hello包的发送
             if (!config.hello)
                 out.name("hello").value(config.hello);
             out.name("ping-spike-threshold").value(config.pingSpikeThreshold);
             out.name("power-block-usage").value(config.powerBlockUsage.toString());
+            out.name("distance-calculation-mode").value(config.distanceCalculationMode.toString());
             final Identifier defaultId = Registries.BLOCK.getDefaultId();
             {
                 out.name("whitelist").beginArray();
@@ -211,6 +215,10 @@ public class Config {
                         }
                         case "power-block-usage": {
                             config.powerBlockUsage = PowerBlockType.of(in.nextString());
+                            break;
+                        }
+                        case "distance-calculation-mode": {
+                            config.distanceCalculationMode = DistanceCalculationMode.of(in.nextString());
                             break;
                         }
                         case "whitelist": {

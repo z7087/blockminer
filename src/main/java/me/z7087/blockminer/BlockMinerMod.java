@@ -6,31 +6,24 @@ import me.z7087.blockminer.task.TaskManager;
 import me.z7087.blockminer.util.BlockBreakUtils;
 import me.z7087.blockminer.util.RotationUtils;
 import net.fabricmc.api.ClientModInitializer;
-//#if MC >= 11802
-import com.mojang.logging.LogUtils;
-import org.slf4j.Logger;
-//#else
-//$$ import org.apache.logging.log4j.LogManager;
-//$$ import org.apache.logging.log4j.Logger;
-//#endif
 
-//#if MC >= 11900
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
-//#else
-//$$ import net.fabricmc.fabric.api.client.command.v1.ClientCommandManager;
-//#endif
 
 import java.io.IOException;
 
 public final class BlockMinerMod implements ClientModInitializer {
     public static final String MOD_ID = "blockminer";
     public static final String HELLO_MESSAGE = "fabric:" + MOD_ID + ":hello";
-    public static final Logger LOGGER;
+    //#if MC >= 11802
+    public static final org.slf4j.Logger LOGGER;
+    //#else
+    //$$ public static final org.apache.logging.log4j.Logger LOGGER;
+    //#endif
     static {
         //#if MC >= 11802
-        LOGGER = LogUtils.getLogger();
+        LOGGER = com.mojang.logging.LogUtils.getLogger();
         //#else
-        //$$ LOGGER = LogManager.getLogger();
+        //$$ LOGGER = org.apache.logging.log4j.LogManager.getLogger();
         //#endif
     }
     public static BlockMinerMod INSTANCE;

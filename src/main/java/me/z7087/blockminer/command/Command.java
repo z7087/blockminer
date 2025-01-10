@@ -6,6 +6,7 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import me.z7087.blockminer.BlockMinerMod;
 import me.z7087.blockminer.config.Config;
+import me.z7087.blockminer.util.enums.DistanceCalculationMode;
 import me.z7087.blockminer.util.enums.PowerBlockType;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.block.Block;
@@ -171,6 +172,45 @@ public final class Command {
                                         return 1;
                                     }
                                     context.getSource().sendFeedback(Text.of("ping-spike-threshold already set to \"both\""));
+                                    return 0;
+                                })
+                        )
+                ).then(literal("distance-calculation-mode")
+                        .executes((context) -> {
+                            context.getSource().sendFeedback(Text.of(BlockMinerMod.INSTANCE.config.distanceCalculationMode.toString()));
+                            return 1;
+                        })
+                        .then(literal("old")
+                                .executes(context -> {
+                                    Config config = BlockMinerMod.INSTANCE.config;
+                                    if (config.distanceCalculationMode != DistanceCalculationMode.Old) {
+                                        config.distanceCalculationMode = DistanceCalculationMode.Old;
+                                        BlockMinerMod.INSTANCE.tryToSaveConfig();
+                                        return 1;
+                                    }
+                                    context.getSource().sendFeedback(Text.of("distance-calculation-mode already set to \"old\""));
+                                    return 0;
+                                })
+                        ).then(literal("1.19")
+                                .executes(context -> {
+                                    Config config = BlockMinerMod.INSTANCE.config;
+                                    if (config.distanceCalculationMode != DistanceCalculationMode.V1_19) {
+                                        config.distanceCalculationMode = DistanceCalculationMode.V1_19;
+                                        BlockMinerMod.INSTANCE.tryToSaveConfig();
+                                        return 1;
+                                    }
+                                    context.getSource().sendFeedback(Text.of("distance-calculation-mode already set to \"1.19\""));
+                                    return 0;
+                                })
+                        ).then(literal("1.20.6")
+                                .executes(context -> {
+                                    Config config = BlockMinerMod.INSTANCE.config;
+                                    if (config.distanceCalculationMode != DistanceCalculationMode.V1_20_6) {
+                                        config.distanceCalculationMode = DistanceCalculationMode.V1_20_6;
+                                        BlockMinerMod.INSTANCE.tryToSaveConfig();
+                                        return 1;
+                                    }
+                                    context.getSource().sendFeedback(Text.of("distance-calculation-mode already set to \"1.20.6\""));
                                     return 0;
                                 })
                         )

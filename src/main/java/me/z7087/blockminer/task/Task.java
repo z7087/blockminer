@@ -119,9 +119,9 @@ public class Task implements Comparable<Task> {
                         for (PistonPowerInfo pistonPowerInfo : pistonPowerInfos) {
                             this.pistonPowerInfo = pistonPowerInfo;
                             final BlockPos dependBlockPos;
-                            if (BlockUtils.playerCanTouchServerside(player, pistonPowerInfo.pistonPos, 1)
-                                    && BlockUtils.playerCanTouchServerside(player, pistonPowerInfo.powerBlockPos, 1)
-                                    && BlockUtils.playerCanTouchServerside(player, (dependBlockPos = pistonPowerInfo.powerBlockPos.offset(pistonPowerInfo.powerBlockFace.getOpposite())), 1)
+                            if (BlockUtils.playerCanTouchServerside(player, pistonPowerInfo.pistonPos, 1, false)
+                                    && BlockUtils.playerCanTouchServerside(player, pistonPowerInfo.powerBlockPos, 1, false)
+                                    && BlockUtils.playerCanTouchServerside(player, (dependBlockPos = pistonPowerInfo.powerBlockPos.offset(pistonPowerInfo.powerBlockFace.getOpposite())), 1, false)
                                     && world.canPlace(Blocks.STONE.getDefaultState(), pistonPowerInfo.pistonPos, ShapeContext.absent())
                                     // 当依赖方块是目标方块时，无法创建无头活塞
                                     && (!BlockMinerMod.INSTANCE.config.headlessPistonMode || !dependBlockPos.equals(targetPos))) {
@@ -209,9 +209,9 @@ public class Task implements Comparable<Task> {
                             retry();
                             break;
                         }
-                        if (!BlockUtils.playerCanTouchServerside(player, pistonPowerInfo.pistonPos, 1)
-                                || !BlockUtils.playerCanTouchServerside(player, pistonPowerInfo.powerBlockPos, 1)
-                                || !BlockUtils.playerCanTouchServerside(player, dependBlockPos, 1)) {
+                        if (!BlockUtils.playerCanTouchServerside(player, pistonPowerInfo.pistonPos, 1, false)
+                                || !BlockUtils.playerCanTouchServerside(player, pistonPowerInfo.powerBlockPos, 1, false)
+                                || !BlockUtils.playerCanTouchServerside(player, dependBlockPos, 1, false)) {
                             // 距离不够，重新找
                             retry();
                             break;
@@ -389,7 +389,7 @@ public class Task implements Comparable<Task> {
                                 retry();
                                 break loop;
                             }
-                            if (BlockUtils.playerCanTouchServerside(player, pistonPowerInfo.pistonPos, 1) && !BlockMinerMod.INSTANCE.blockBreakUtils.isModBreakingBlock()) {
+                            if (BlockUtils.playerCanTouchServerside(player, pistonPowerInfo.pistonPos, 1, true) && !BlockMinerMod.INSTANCE.blockBreakUtils.isModBreakingBlock()) {
                                 BlockMinerMod.INSTANCE.blockBreakUtils.setBreaking(true);
                                 isMining = true;
                                 interactionManager.cancelBlockBreaking();
@@ -423,18 +423,18 @@ public class Task implements Comparable<Task> {
                             inventory.selectedSlot = pickaxeIndex;
                             ((ClientPlayerInteractionManagerAccessor) interactionManager).invokeSyncSelectedSlot();
                         }
-                        if (!BlockUtils.playerCanTouchServerside(player, pistonPowerInfo.pistonPos, 1)) {
+                        if (!BlockUtils.playerCanTouchServerside(player, pistonPowerInfo.pistonPos, 1, true)) {
                             rotationUtils.markKeepRotation();
                             // 太远挖不到活塞，延后
                             break loop;
                         }
-                        if (!BlockUtils.playerCanTouchServerside(player, pistonPowerInfo.powerBlockPos, 1)) {
+                        if (!BlockUtils.playerCanTouchServerside(player, pistonPowerInfo.powerBlockPos, 1, true)) {
                             rotationUtils.markKeepRotation();
                             // 太远碰不到拉杆，延后
                             break loop;
                         }
                         BlockPos dependBlockPos = pistonPowerInfo.powerBlockPos.offset(pistonPowerInfo.powerBlockFace.getOpposite());
-                        if (redstoneTorchIndex != -1 && BlockMinerMod.INSTANCE.config.headlessPistonMode && !BlockUtils.playerCanTouchServerside(player, pistonPowerInfo.powerBlockPos.offset(pistonPowerInfo.powerBlockFace.getOpposite()), 1)) {
+                        if (redstoneTorchIndex != -1 && BlockMinerMod.INSTANCE.config.headlessPistonMode && !BlockUtils.playerCanTouchServerside(player, pistonPowerInfo.powerBlockPos.offset(pistonPowerInfo.powerBlockFace.getOpposite()), 1, false)) {
                             rotationUtils.markKeepRotation();
                             // 如果是无头活塞模式，且此task使用红石火把，且太远碰不到拉杆依附的方块，延后
                             break loop;
