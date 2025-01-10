@@ -47,8 +47,8 @@ public abstract class MixinClientPlayerEntity {
     //$$ @Redirect(method = "sendMovementPackets",
     //$$         at = @At(
     //$$                 value = "FIELD",
-    //$$                 target = "Lnet/minecraft/client/network/ClientPlayerEntity;yaw:F",
-    //$$                 opcode = org.objectweb.asm.Opcodes.PUTFIELD
+    //$$                 target = "Lnet/minecraft/client/network/ClientPlayerEntity;pitch:F",
+    //$$                 opcode = org.objectweb.asm.Opcodes.GETFIELD
     //$$         )
     //$$ )
     //#endif
