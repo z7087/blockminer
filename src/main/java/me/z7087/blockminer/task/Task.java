@@ -481,6 +481,7 @@ public class Task implements Comparable<Task> {
                             while (interactionManager.isBreakingBlock() && interactionManagerAccessor.invokeIsCurrentlyBreaking(pistonPowerInfo.pistonPos))
                                 interactionManager.updateBlockBreakingProgress(pistonPowerInfo.pistonPos, Direction.DOWN);
                             BlockMinerMod.INSTANCE.blockBreakUtils.setBreaking(false);
+                            isMining = false;
                         }
                         if (BlockMinerMod.INSTANCE.config.headlessPistonMode) {
                             // 无头活塞模式下的重新放置阶段，先重新激活信号源或先放置活塞都是可以的

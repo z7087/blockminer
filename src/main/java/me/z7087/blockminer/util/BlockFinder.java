@@ -47,6 +47,8 @@ public final class BlockFinder {
                     final BlockPos pistonHeadPos = pistonPos.offset(face);
                     if (world.isInBuildLimit(pistonHeadPos)
                             && BlockUtils.isReplaceable(world.getBlockState(pistonHeadPos))
+                            // 防止玩家被活塞推动
+                            && world.canPlace(stoneState, pistonHeadPos, ShapeContext.absent())
                             && isPistonPlaceSafe(world, pistonPos, face)
                     ) {
                         possiblePistonLocations.add(Pair.of(pistonPos, face));

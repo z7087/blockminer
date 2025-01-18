@@ -5,6 +5,7 @@ import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import me.z7087.blockminer.BlockMinerMod;
+import me.z7087.blockminer.command.argument.BlockPosArgumentType;
 import me.z7087.blockminer.config.Config;
 import me.z7087.blockminer.util.enums.DistanceCalculationMode;
 import me.z7087.blockminer.util.enums.PowerBlockType;
@@ -13,6 +14,7 @@ import net.minecraft.block.Block;
 import net.minecraft.command.argument.BlockStateArgument;
 import net.minecraft.command.argument.BlockStateArgumentType;
 import net.minecraft.text.Text;
+import net.minecraft.util.math.BlockPos;
 
 import java.io.IOException;
 
@@ -284,6 +286,20 @@ public final class Command {
                                                             return 0;
                                                         })
                                         )
+                                )
+                        )
+                ).then(literal("area")
+                        .then(argument("start", BlockPosArgumentType.blockPos())
+                                .then(argument("end", BlockPosArgumentType.blockPos())
+                                        .executes(context -> {
+                                            if (!BlockMinerMod.INSTANCE.config.debug) {
+                                                context.getSource().sendFeedback(Text.of("debug not enabled"));
+                                                return 0;
+                                            }
+                                            final BlockPos start = BlockPosArgumentType.getBlockPos(context, "start");
+                                            final BlockPos end = BlockPosArgumentType.getBlockPos(context, "end");
+                                            return BlockMinerMod.INSTANCE.taskManager.addAura(start, end) ? 1 : 0;
+                                        })
                                 )
                         )
                 )
