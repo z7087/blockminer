@@ -16,6 +16,7 @@ import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.client.network.ClientPlayerInteractionManager;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.entity.player.PlayerInventory;
+import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.item.PickaxeItem;
 import net.minecraft.util.ActionResult;
@@ -103,7 +104,7 @@ public class Task implements Comparable<Task> {
                             redstoneTorchIndex = powerBlockUsage.isRedstoneTorch() && canInstantMinePiston
                                     ? InventoryUtils.findFirstItemInHotbar(inventory, Items.REDSTONE_TORCH)
                                     : -1;
-                            leverIndex = powerBlockUsage.isLever()
+                            leverIndex = powerBlockUsage.isLever() && !canSwitchHandDenyUse(player, inventory)
                                     ? InventoryUtils.findFirstItemInHotbar(inventory, Items.LEVER)
                                     : -1;
                         }
@@ -223,9 +224,16 @@ public class Task implements Comparable<Task> {
                             retry();
                             break loop;
                         }
+                        if (redstoneTorchIndex == -1 || !pistonPowerInfo.getPowerBlockType().isRedstoneTorch()) {
+                            // 对于拉杆放置，检查是否无法使用拉杆
+                            if (canSwitchHandDenyUse(player, inventory)) {
+                                retry();
+                                break loop;
+                            }
+                        }
                         {
                             // 凭空放置
-                            ActionResult result = InventoryUtils.moveToOffhandDuring(player,
+                            ActionResult result = InventoryUtils.moveToOffHandDuring(player,
                                     pistonIndex,
                                     () -> rotationUtils.useServerSideRotationDuring(
                                             player,
@@ -256,7 +264,7 @@ public class Task implements Comparable<Task> {
                                 break loop;
                             }
                             // 凭空放置
-                            ActionResult result = InventoryUtils.moveToOffhandDuring(player,
+                            ActionResult result = InventoryUtils.moveToOffHandDuring(player,
                                     dependBlockIndex,
                                     () -> BlockUtils.interactBlock(interactionManager,
                                             player,
@@ -277,7 +285,7 @@ public class Task implements Comparable<Task> {
                         if (redstoneTorchIndex != -1 && pistonPowerInfo.getPowerBlockType().isRedstoneTorch()) {
                             leverIndex = -1;
                             // 放在那个方块上
-                            ActionResult result = InventoryUtils.moveToOffhandDuring(player,
+                            ActionResult result = InventoryUtils.moveToOffHandDuring(player,
                                     redstoneTorchIndex,
                                     () -> BlockUtils.interactBlock(interactionManager,
                                             player,
@@ -295,7 +303,7 @@ public class Task implements Comparable<Task> {
                         } else if (leverIndex != -1 && pistonPowerInfo.getPowerBlockType().isLever()) {
                             redstoneTorchIndex = -1;
                             // 放在那个方块上
-                            ActionResult result = InventoryUtils.moveToOffhandDuring(player,
+                            ActionResult result = InventoryUtils.moveToOffHandDuring(player,
                                     leverIndex,
                                     () -> BlockUtils.interactBlock(interactionManager,
                                             player,
@@ -311,18 +319,22 @@ public class Task implements Comparable<Task> {
                             );
                             assertTrue(result.isAccepted());
                             // 拉拉杆
-                            result = BlockUtils.interactBlock(interactionManager,
-                                    player,
-                                    world,
-                                    Hand.MAIN_HAND,
-                                    new BlockHitResult(
-                                            Vec3d.of(pistonPowerInfo.powerBlockPos),
-                                            pistonPowerInfo.powerBlockFace,
-                                            pistonPowerInfo.powerBlockPos,
-                                            false
+                            result = InventoryUtils.useEmptyMainHandIfSneakingDuring(player,
+                                    inventory,
+                                    () -> BlockUtils.interactBlock(interactionManager,
+                                            player,
+                                            world,
+                                            Hand.MAIN_HAND,
+                                            new BlockHitResult(
+                                                    Vec3d.of(pistonPowerInfo.powerBlockPos),
+                                                    pistonPowerInfo.powerBlockFace,
+                                                    pistonPowerInfo.powerBlockPos,
+                                                    false
+                                            )
                                     )
                             );
-                            assertTrue(result.isAccepted());
+                            if (!result.isAccepted())
+                                assertTrue(result.isAccepted());
                         } else {
                             shouldNotReachHere();
                         }
@@ -430,13 +442,18 @@ public class Task implements Comparable<Task> {
                         }
                         if (!BlockUtils.playerCanTouchServerside(player, pistonPowerInfo.powerBlockPos, 1, true)) {
                             rotationUtils.markKeepRotation();
-                            // 太远碰不到拉杆，延后
+                            // 太远碰不到能源方块，延后
                             break loop;
                         }
                         BlockPos dependBlockPos = pistonPowerInfo.powerBlockPos.offset(pistonPowerInfo.powerBlockFace.getOpposite());
                         if (redstoneTorchIndex != -1 && BlockMinerMod.INSTANCE.config.headlessPistonMode && !BlockUtils.playerCanTouchServerside(player, pistonPowerInfo.powerBlockPos.offset(pistonPowerInfo.powerBlockFace.getOpposite()), 1, false)) {
                             rotationUtils.markKeepRotation();
-                            // 如果是无头活塞模式，且此task使用红石火把，且太远碰不到拉杆依附的方块，延后
+                            // 如果是无头活塞模式，且此task使用红石火把，且太远碰不到红石火把依附的方块，延后
+                            break loop;
+                        }
+                        if (leverIndex != -1 && canSwitchHandDenyUse(player, inventory)) {
+                            // 如果是拉杆模式且无法使用拉杆，延后
+                            rotationUtils.markKeepRotation();
                             break loop;
                         }
                         if (redstoneTorchIndex != -1) {
@@ -444,15 +461,18 @@ public class Task implements Comparable<Task> {
                             interactionManager.attackBlock(pistonPowerInfo.powerBlockPos, Direction.DOWN);
                         } else {
                             // 拉拉杆
-                            ActionResult result = BlockUtils.interactBlock(interactionManager,
-                                    player,
-                                    world,
-                                    Hand.MAIN_HAND,
-                                    new BlockHitResult(
-                                            Vec3d.of(pistonPowerInfo.powerBlockPos),
-                                            pistonPowerInfo.powerBlockFace,
-                                            pistonPowerInfo.powerBlockPos,
-                                            false
+                            ActionResult result = InventoryUtils.useEmptyMainHandIfSneakingDuring(player,
+                                    inventory,
+                                    () -> BlockUtils.interactBlock(interactionManager,
+                                            player,
+                                            world,
+                                            Hand.MAIN_HAND,
+                                            new BlockHitResult(
+                                                    Vec3d.of(pistonPowerInfo.powerBlockPos),
+                                                    pistonPowerInfo.powerBlockFace,
+                                                    pistonPowerInfo.powerBlockPos,
+                                                    false
+                                            )
                                     )
                             );
                             if (!result.isAccepted()) {
@@ -489,7 +509,7 @@ public class Task implements Comparable<Task> {
                             ActionResult result;
                             if (redstoneTorchIndex != -1) {
                                 // 重新放置红石火把
-                                result = InventoryUtils.moveToOffhandDuring(player,
+                                result = InventoryUtils.moveToOffHandDuring(player,
                                         redstoneTorchIndex,
                                         () -> BlockUtils.interactBlock(interactionManager,
                                                 player,
@@ -505,15 +525,18 @@ public class Task implements Comparable<Task> {
                                 );
                             } else {
                                 // 拉拉杆
-                                result = BlockUtils.interactBlock(interactionManager,
-                                        player,
-                                        world,
-                                        Hand.MAIN_HAND,
-                                        new BlockHitResult(
-                                                Vec3d.of(pistonPowerInfo.powerBlockPos),
-                                                pistonPowerInfo.powerBlockFace,
-                                                pistonPowerInfo.powerBlockPos,
-                                                false
+                                result = InventoryUtils.useEmptyMainHandIfSneakingDuring(player,
+                                        inventory,
+                                        () -> BlockUtils.interactBlock(interactionManager,
+                                                player,
+                                                world,
+                                                Hand.MAIN_HAND,
+                                                new BlockHitResult(
+                                                        Vec3d.of(pistonPowerInfo.powerBlockPos),
+                                                        pistonPowerInfo.powerBlockFace,
+                                                        pistonPowerInfo.powerBlockPos,
+                                                        false
+                                                )
                                         )
                                 );
                             }
@@ -524,7 +547,7 @@ public class Task implements Comparable<Task> {
                             }
                         }
                         // 重新凭空放置活塞
-                        ActionResult result = InventoryUtils.moveToOffhandDuring(
+                        ActionResult result = InventoryUtils.moveToOffHandDuring(
                                 player,
                                 pistonIndex,
                                 () -> rotationUtils.useServerSideRotationDuring(
@@ -567,6 +590,19 @@ public class Task implements Comparable<Task> {
             Objects.requireNonNull(MinecraftClient.getInstance().interactionManager).cancelBlockBreaking();
             isMining = false;
         }
+    }
+
+    private static boolean canDenyUse(ClientPlayerEntity player) {
+        return player.isSneaking() && (!player.getMainHandStack().isEmpty() || !player.getOffHandStack().isEmpty());
+    }
+
+    private static boolean canSwitchHandDenyUse(ClientPlayerEntity player, PlayerInventory inventory) {
+        if (player.isSneaking()) {
+            if (!player.getOffHandStack().isEmpty())
+                return true;
+            return InventoryUtils.findFirstItemInHotbar(inventory, ItemStack::isEmpty) == -1;
+        }
+        return false;
     }
 
     private static void assertTrue(boolean result) {

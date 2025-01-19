@@ -133,7 +133,7 @@ public final class InventoryUtils {
         return -1;
     }
 
-    public static <T> T moveToOffhandDuring(ClientPlayerEntity player, int hotbarSlot, Supplier<T> supplier) {
+    public static <T> T moveToOffHandDuring(ClientPlayerEntity player, int hotbarSlot, Supplier<T> supplier) {
         if (player.currentScreenHandler != player.playerScreenHandler)
             throw new IllegalStateException("player.currentScreenHandler != player.playerScreenHandler");
         if (hotbarSlot < 0 || hotbarSlot > 8)
@@ -143,6 +143,23 @@ public final class InventoryUtils {
         T result = supplier.get();
         interactionManager.clickSlot(0, hotbarSlot + HOTBAR_START, 40, SlotActionType.SWAP, player);
         return result;
+    }
+
+    public static <T> T useEmptyMainHandIfSneakingDuring(ClientPlayerEntity player, PlayerInventory inventory, Supplier<T> supplier) {
+        if (player.currentScreenHandler != player.playerScreenHandler)
+            throw new IllegalStateException("player.currentScreenHandler != player.playerScreenHandler");
+        if (!inventory.getMainHandStack().isEmpty() && player.isSneaking()) {
+            int oldIndex = inventory.selectedSlot;
+            int newIndex = findFirstItemInHotbar(inventory, ItemStack::isEmpty);
+            if (newIndex == -1)
+                throw new IllegalStateException("full hotbar");
+            ClientPlayerInteractionManager interactionManager = Objects.requireNonNull(MinecraftClient.getInstance().interactionManager);
+            interactionManager.clickSlot(0, oldIndex + HOTBAR_START, newIndex, SlotActionType.SWAP, player);
+            T result = supplier.get();
+            interactionManager.clickSlot(0, oldIndex + HOTBAR_START, newIndex, SlotActionType.SWAP, player);
+            return result;
+        }
+        return supplier.get();
     }
 
     /**
