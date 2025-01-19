@@ -35,26 +35,31 @@ public class BlockPosArgumentType implements ArgumentType<BlockPos> {
     }
 
     private static int parsePositionX(StringReader reader, Entity player) throws CommandSyntaxException {
-        if (reader.peek() == '~')
+        if (reader.peek() == '~') {
+            reader.skip();
             return (int) (player == null ? 0 : player.getX() + reader.readDouble());
+        }
         return (int) reader.readDouble();
     }
 
     private static int parsePositionY(StringReader reader, Entity player) throws CommandSyntaxException {
-        if (reader.peek() == '~')
+        if (reader.peek() == '~') {
+            reader.skip();
             return (int) (player == null ? 0 : player.getY() + reader.readDouble());
+        }
         return (int) reader.readDouble();
     }
 
     private static int parsePositionZ(StringReader reader, Entity player) throws CommandSyntaxException {
-        if (reader.peek() == '~')
+        if (reader.peek() == '~') {
+            reader.skip();
             return (int) (player == null ? 0 : player.getZ() + reader.readDouble());
+        }
         return (int) reader.readDouble();
     }
 
     @Override
     public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> context, SuggestionsBuilder builder) {
-        StringReader reader = new StringReader(builder.getRemaining());
         final HitResult target = MinecraftClient.getInstance().crosshairTarget;
         final Collection<CommandSource.RelativePosition> blockPosSuggestions;
         if (target != null && target.getType() == HitResult.Type.BLOCK) {
