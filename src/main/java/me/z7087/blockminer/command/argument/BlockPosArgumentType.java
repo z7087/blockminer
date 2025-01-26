@@ -37,7 +37,7 @@ public class BlockPosArgumentType implements ArgumentType<BlockPos> {
     private static int parsePositionX(StringReader reader, Entity player) throws CommandSyntaxException {
         if (reader.peek() == '~') {
             reader.skip();
-            return (int) (player == null ? 0 : player.getX() + reader.readDouble());
+            return (int) ((player == null ? 0 : player.getX()) + reader.readDouble());
         }
         return (int) reader.readDouble();
     }
@@ -45,7 +45,7 @@ public class BlockPosArgumentType implements ArgumentType<BlockPos> {
     private static int parsePositionY(StringReader reader, Entity player) throws CommandSyntaxException {
         if (reader.peek() == '~') {
             reader.skip();
-            return (int) (player == null ? 0 : player.getY() + reader.readDouble());
+            return (int) ((player == null ? 0 : player.getY()) + reader.readDouble());
         }
         return (int) reader.readDouble();
     }
@@ -53,7 +53,7 @@ public class BlockPosArgumentType implements ArgumentType<BlockPos> {
     private static int parsePositionZ(StringReader reader, Entity player) throws CommandSyntaxException {
         if (reader.peek() == '~') {
             reader.skip();
-            return (int) (player == null ? 0 : player.getZ() + reader.readDouble());
+            return (int) ((player == null ? 0 : player.getZ()) + reader.readDouble());
         }
         return (int) reader.readDouble();
     }
