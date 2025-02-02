@@ -110,8 +110,8 @@ public final class BlockFinder {
                 && !powerBlockPos.equals(pistonHeadPos)
                 && world.isInBuildLimit(powerBlockPos)
         ) {
-            BlockState state = world.getBlockState(powerBlockPos);
-            if (BlockUtils.isReplaceable(state)) {
+            BlockState powerBlockPosState = world.getBlockState(powerBlockPos);
+            if (BlockUtils.isReplaceable(powerBlockPosState)) {
                 for (Direction dependDirection : DIRECTIONS) {
                     BlockPos dependBlockPos = powerBlockPos.offset(dependDirection);
                     if (!dependBlockPos.equals(pistonPos)
@@ -120,15 +120,17 @@ public final class BlockFinder {
                         findPowerBlockForPistonInternal2(deduplicationMapSolidDependBlock, deduplicationMapReplaceableDependBlock, world, dependDirection, dependBlockPos, isRedstoneTorch && !dependBlockPos.equals(pistonPos.up()), powerBlockPos, isLever, pistonPos, pistonFace);
                     }
                 }
-            } else if (state.isSolidBlock(world, powerBlockPos) && state.isFullCube(world, powerBlockPos)) {
-                for (Direction dependDirection : DIRECTIONS) {
-                    BlockPos actualPowerBlockPos = powerBlockPos.offset(dependDirection);
+            } else if (powerBlockPosState.isSolidBlock(world, powerBlockPos) && !(powerBlockPosState.getBlock() instanceof PistonBlock)) {
+                // powerBlockPos现在是依赖方块了
+                for (Direction reversedDependDirection : DIRECTIONS) {
+                    BlockPos actualPowerBlockPos = powerBlockPos.offset(reversedDependDirection);
                     if (!actualPowerBlockPos.equals(pistonPos)
                             && !actualPowerBlockPos.equals(pistonHeadPos)
                             && world.isInBuildLimit(actualPowerBlockPos)
+                            && powerBlockPosState.isSideSolidFullSquare(world, powerBlockPos, reversedDependDirection)
                             && BlockUtils.isReplaceable(world.getBlockState(actualPowerBlockPos))
                     ) {
-                        findPowerBlockForPistonInternal2(deduplicationMapSolidDependBlock, deduplicationMapReplaceableDependBlock, world, dependDirection.getOpposite(), powerBlockPos, false, actualPowerBlockPos, isLever, pistonPos, pistonFace);
+                        findPowerBlockForPistonInternal2(deduplicationMapSolidDependBlock, deduplicationMapReplaceableDependBlock, world, reversedDependDirection.getOpposite(), powerBlockPos, false, actualPowerBlockPos, isLever, pistonPos, pistonFace);
                     }
                 }
             }
@@ -138,7 +140,7 @@ public final class BlockFinder {
     private static void findPowerBlockForPistonInternal2(Map<PistonPowerInfo, PistonPowerInfo> deduplicationMapSolidDependBlock, Map<PistonPowerInfo, PistonPowerInfo> deduplicationMapReplaceableDependBlock, World world, Direction dependDirection, BlockPos dependBlockPos, boolean isRedstoneTorch, BlockPos powerBlockPos, boolean isLever, BlockPos pistonPos, Direction pistonFace) {
         BlockState dependBlockState = world.getBlockState(dependBlockPos);
         final boolean dependBlockIsReplaceable = BlockUtils.isReplaceable(dependBlockState);
-        if ((dependBlockIsReplaceable && world.canPlace(Blocks.STONE.getDefaultState(), dependBlockPos, ShapeContext.absent())) || (Block.sideCoversSmallSquare(world, dependBlockPos, dependDirection.getOpposite()) && !(dependBlockState.getBlock() instanceof PistonBlock))) {
+        if ((dependBlockIsReplaceable && world.canPlace(Blocks.STONE.getDefaultState(), dependBlockPos, ShapeContext.absent())) || (dependBlockState.isSolidBlock(world, dependBlockPos) && dependBlockState.isSideSolidFullSquare(world, dependBlockPos, dependDirection.getOpposite()) && !(dependBlockState.getBlock() instanceof PistonBlock))) {
             boolean redstoneTorch = false;
             boolean lever = false;
             // 找到能源方块和其附着方向，检查会不会干扰其他task或被其他方块干扰
@@ -170,12 +172,11 @@ public final class BlockFinder {
                     if (world.getReceivedStrongRedstonePower(dependBlockPos) > 0)
                         break check;
 
-                    // 如果红石火把上面有完整固体方块，且固体方块旁边有附着在上面的红石火把或活塞，不能放置
+                    // 如果红石火把上面有固体方块，且固体方块旁边有附着在上面的红石火把或活塞，不能放置
                     {
                         BlockPos powerBlockPosUp = powerBlockPos.up();
                         BlockState powerBlockStateUp = world.getBlockState(powerBlockPosUp);
-                        if (powerBlockStateUp.isSolidBlock(world, powerBlockPosUp)
-                                && powerBlockStateUp.isFullCube(world, powerBlockPosUp)) {
+                        if (powerBlockStateUp.isSolidBlock(world, powerBlockPosUp)) {
                             for (Direction direction1 : DIRECTIONS) {
                                 BlockPos pos = powerBlockPosUp.offset(direction1);
                                 BlockState blockState = world.getBlockState(pos);
@@ -217,9 +218,8 @@ public final class BlockFinder {
                     if (BlockUtils.getDistance(pistonPos, powerBlockPos) > 1
                             && BlockUtils.getDistance(pistonPos, dependBlockPos) > 1)
                         break check;
-                    // 如果拉杆所附着的方块是完整固体方块，且固体方块旁边有附着在上面的红石火把或活塞，不能放置
-                    if (dependBlockState.isSolidBlock(world, dependBlockPos)
-                            && dependBlockState.isFullCube(world, dependBlockPos)) {
+                    // 如果拉杆所附着的方块是固体方块，且固体方块旁边有附着在上面的红石火把或活塞，不能放置
+                    if (dependBlockState.isSolidBlock(world, dependBlockPos)) {
                         for (Direction direction1 : DIRECTIONS) {
                             BlockPos pos = dependBlockPos.offset(direction1);
                             BlockState blockState = world.getBlockState(pos);

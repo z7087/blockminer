@@ -191,6 +191,7 @@ public class Task implements Comparable<Task> {
                     }
                     case PlaceBlocksWithChecks: {
                         BlockPos dependBlockPos = pistonPowerInfo.powerBlockPos.offset(pistonPowerInfo.powerBlockFace.getOpposite());
+                        final BlockState dependBlockState = world.getBlockState(dependBlockPos);
                         if (inventory.getStack(pistonIndex).getItem() != Items.PISTON
                                 || (dependBlockIndex != -1 && !BlockMinerMod.INSTANCE.config.dependBlockWhitelistContains(inventory.getStack(dependBlockIndex).getItem()))
                                 || (redstoneTorchIndex != -1 && inventory.getStack(redstoneTorchIndex).getItem() != Items.REDSTONE_TORCH)
@@ -201,8 +202,9 @@ public class Task implements Comparable<Task> {
                                 || (
                                         !BlockUtils.isReplaceable(world.getBlockState(dependBlockPos))
                                                 && !(
-                                                        Block.sideCoversSmallSquare(world, dependBlockPos, pistonPowerInfo.powerBlockFace)
-                                                                && !(world.getBlockState(dependBlockPos).getBlock() instanceof PistonBlock)
+                                                        dependBlockState.isSolidBlock(world, dependBlockPos)
+                                                                && dependBlockState.isSideSolidFullSquare(world, dependBlockPos, pistonPowerInfo.powerBlockFace)
+                                                                && !(dependBlockState.getBlock() instanceof PistonBlock)
                                                 )
                                 )
                         ) {
