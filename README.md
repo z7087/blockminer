@@ -29,6 +29,8 @@ BlockMiner 支持使用红石火把或拉杆这两种方案破坏方块。
 
 #### [\[QQ频道\]](https://pd.qq.com/s/ddfsvbi80)
 
+#### [\[QQ群聊\]](https://qm.qq.com/q/bYIZVmxjPy)
+
 ## 致谢
 
 ### [LXYan2333](https://github.com/LXYan2333)
