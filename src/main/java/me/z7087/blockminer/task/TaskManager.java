@@ -2,7 +2,6 @@ package me.z7087.blockminer.task;
 
 import me.z7087.blockminer.BlockMinerMod;
 import me.z7087.blockminer.I18n;
-import me.z7087.blockminer.util.BlockUtils;
 import me.z7087.blockminer.util.MessageUtils;
 import me.z7087.blockminer.util.enums.TaskState;
 import net.minecraft.block.Block;
@@ -74,16 +73,16 @@ public class TaskManager {
     public boolean addAura(BlockPos start, BlockPos end) {
         final Set<Block> whitelist = BlockMinerMod.INSTANCE.config.blockWhitelist;
         ClientWorld world = Objects.requireNonNull(MinecraftClient.getInstance().world);
-        Iterator<BlockPos> iterator = BlockPos.iterate(BlockUtils.clampToValidPos(start, world), BlockUtils.clampToValidPos(end, world)).iterator();
+        Iterator<BlockPos> iterator = BlockPos.iterate(start, end).iterator();
         while (iterator.hasNext()) {
             BlockPos pos = iterator.next();
-            if (!posSet.contains(pos) && whitelist.contains(world.getBlockState(pos).getBlock())) {
+            if (world.isInBuildLimit(pos) && !posSet.contains(pos) && whitelist.contains(world.getBlockState(pos).getBlock())) {
                 pos = pos.toImmutable();
                 posSet.add(pos);
                 taskQueue.add(Task.of(pos));
                 while (iterator.hasNext()) {
                     pos = iterator.next();
-                    if (!posSet.contains(pos) && whitelist.contains(world.getBlockState(pos).getBlock())) {
+                    if (world.isInBuildLimit(pos) && !posSet.contains(pos) && whitelist.contains(world.getBlockState(pos).getBlock())) {
                         pos = pos.toImmutable();
                         posSet.add(pos);
                         taskQueue.add(Task.of(pos));

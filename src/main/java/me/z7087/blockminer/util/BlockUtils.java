@@ -11,10 +11,7 @@ import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.World;
-import net.minecraft.world.border.WorldBorder;
 
 public final class BlockUtils {
     private BlockUtils() {}
@@ -22,46 +19,6 @@ public final class BlockUtils {
     public static int getDistance(BlockPos pos1, BlockPos pos2) {
         BlockPos pos3 = pos1.subtract(pos2);
         return Math.abs(pos3.getX()) + Math.abs(pos3.getY()) + Math.abs(pos3.getZ());
-    }
-
-    public static BlockPos clampToValidPos(BlockPos pos, World world) {
-        int x = pos.getX(), y = pos.getY(), z = pos.getZ();
-        final double minX, maxX, minZ, maxZ;
-        {
-            final WorldBorder worldBorder = world.getWorldBorder();
-            minX = worldBorder.getBoundWest();
-            maxX = worldBorder.getBoundEast();
-            minZ = worldBorder.getBoundNorth();
-            maxZ = worldBorder.getBoundSouth();
-        }
-        final int minY, maxY;
-        minY =
-                //#if MC >= 11700
-                world.getBottomY()
-                //#else
-                //$$ 0
-                //#endif
-        ;
-        maxY = minY + world.getHeight();
-        if (x >= minX && x <= maxX && y >= minY && y <= maxY && z >= minZ && z <= maxZ)
-            return pos;
-
-        if (x < minX)
-            x = MathHelper.ceil(minX);
-        else if (x > maxX)
-            x = MathHelper.floor(maxX);
-
-        if (y < minY)
-            y = MathHelper.ceil(minY);
-        else if (y > maxY)
-            y = MathHelper.floor(maxY);
-
-        if (z < minZ)
-            z = MathHelper.ceil(minZ);
-        else if (z > maxZ)
-            z = MathHelper.floor(maxZ);
-
-        return new BlockPos(x, y, z);
     }
 
     public static ActionResult interactBlock(ClientPlayerInteractionManager interactionManager, ClientPlayerEntity player, ClientWorld ignoredWorld, Hand hand, BlockHitResult hitResult) {
