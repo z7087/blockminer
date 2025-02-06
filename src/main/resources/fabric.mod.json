@@ -5,30 +5,23 @@
   "name": "${name}",
   "description": "Client mod to mine unbreakable blocks",
   "authors": [
-    "7087z",
-    "Bunny_i"
+    "7087z"
   ],
   "contact": {
-    "sources": "https://github.com/z7087/blockminer"
+    "sources": "https://github.com/z7087/blockminer/tree/easyplace-exploit"
   },
   "license": "GPL-3.0",
-  "icon": "assets/blockminer/icon.png",
   "environment": "client",
   "entrypoints": {
     "client": [
-      "me.z7087.blockminer.BlockMinerMod"
-    ],
-    "main": [
+      "me.z7087.easyplacexploit.EasyplacExploit"
     ]
   },
   "mixins": [
-    "blockminer.mixins.json"
+    "easyplacexploit.mixins.json"
   ],
   "depends": {
     "fabricloader": ">=0.11.4",
     "minecraft": "${minecraft_dependency}"
-  },
-  "recommends": {
-    "fabric-api": "*"
   }
 }

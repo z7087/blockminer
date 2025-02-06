@@ -29,16 +29,8 @@ dependencies {
 //		modRuntimeOnly(mcVersion < 11900 ? "com.github.astei:lazydfu:0.1.2" : "com.github.Fallen-Breath:lazydfu:a7cfc44c0c")
 //	}
 
-    // dependencies
-    Set<String> apiModules = [
-            mcVersion >= 1_19_00 ? "fabric-command-api-v2" : "fabric-command-api-v1",
-            "fabric-resource-loader-v0"
-    ]
-    // Add each module as a dependency
-    apiModules.forEach {
-        modImplementation(fabricApi.module(it, project.fabric_api_version))
-    }
-//	include(modImplementation(fabricApi.module("fabric-resource-loader-v0", project.fabric_api_version)))
+    include(modImplementation(fabricApi.module("fabric-resource-loader-v0", project.fabric_api_version)))
+	include(modImplementation(fabricApi.module("fabric-key-binding-api-v1", project.fabric_api_version)))
 //	include(modImplementation("me.fallenbreath:conditional-mixin-fabric:${project.conditionalmixin_version}"))
 //	include(annotationProcessor(implementation("io.github.llamalad7:mixinextras-fabric:${project.mixinextras_version}")))
 }
@@ -114,7 +106,7 @@ processResources {
 //        }
     }
 
-    filesMatching("blockminer.mixins.json") {
+    filesMatching("easyplacexploit.mixins.json") {
         filter { s -> s.replace('{{COMPATIBILITY_LEVEL}}', "JAVA_${MIXIN_COMPATIBILITY_LEVEL.ordinal() + 1}") }
     }
 }
