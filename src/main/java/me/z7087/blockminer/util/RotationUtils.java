@@ -1,6 +1,6 @@
 package me.z7087.blockminer.util;
 
-import me.z7087.blockminer.mixin.ClientPlayerEntityAccessor;
+import me.z7087.blockminer.mixin.minecraft.client.network.ClientPlayerEntityAccessor;
 import me.z7087.blockminer.util.data.Rotation;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;

@@ -1,7 +1,7 @@
 package me.z7087.blockminer.task;
 
 import me.z7087.blockminer.BlockMinerMod;
-import me.z7087.blockminer.mixin.ClientPlayerInteractionManagerAccessor;
+import me.z7087.blockminer.mixin.minecraft.client.network.ClientPlayerInteractionManagerAccessor;
 import me.z7087.blockminer.util.BlockFinder;
 import me.z7087.blockminer.util.BlockUtils;
 import me.z7087.blockminer.util.InventoryUtils;

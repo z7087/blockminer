@@ -4,14 +4,16 @@
   "package": "me.z7087.blockminer.mixin",
   "compatibilityLevel": "{{COMPATIBILITY_LEVEL}}",
   "mixins": [
-    "MixinClientLoginNetworkHandler"
+    "minecraft.network.ClientConnectionAccessor",
+    "minecraft.network.MixinClientConnection"
   ],
   "client": [
-    "ClientPlayerEntityAccessor",
-    "ClientPlayerInteractionManagerAccessor",
-    "MixinClientPlayerEntity",
-    "MixinClientPlayerInteractionManager",
-    "MixinMinecraftClient"
+    "minecraft.client.MixinMinecraftClient",
+    "minecraft.client.network.ClientPlayerEntityAccessor",
+    "minecraft.client.network.ClientPlayerInteractionManagerAccessor",
+    "minecraft.client.network.MixinClientLoginNetworkHandler",
+    "minecraft.client.network.MixinClientPlayerEntity",
+    "minecraft.client.network.MixinClientPlayerInteractionManager"
   ],
   "injectors": {
     "defaultRequire": 1

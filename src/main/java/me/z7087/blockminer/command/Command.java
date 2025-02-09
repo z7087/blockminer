@@ -119,6 +119,25 @@ public final class Command {
                                             return 0;
                                         })
                         )
+                ).then(literal("blink-during-tasks-tick")
+                        .executes((context) -> {
+                            context.getSource().sendFeedback(Text.of(String.valueOf(BlockMinerMod.INSTANCE.config.blinkDuringTasksTick)));
+                            return 1;
+                        })
+                        .then(
+                                argument("bool", BoolArgumentType.bool())
+                                        .executes(context -> {
+                                            Config config = BlockMinerMod.INSTANCE.config;
+                                            boolean input = BoolArgumentType.getBool(context, "bool");
+                                            if (config.blinkDuringTasksTick != input) {
+                                                config.blinkDuringTasksTick = input;
+                                                BlockMinerMod.INSTANCE.tryToSaveConfig();
+                                                return 1;
+                                            }
+                                            context.getSource().sendFeedback(Text.of("blink-during-tasks-tick already set to " + input));
+                                            return 0;//blinkDuringTasksTick
+                                        })
+                        )
                 ).then(literal("ping-spike-threshold")
                         .executes((context) -> {
                             context.getSource().sendFeedback(Text.of(String.valueOf(BlockMinerMod.INSTANCE.config.pingSpikeThreshold)));

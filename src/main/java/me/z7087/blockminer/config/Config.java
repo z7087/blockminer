@@ -31,6 +31,7 @@ public class Config {
     public boolean debug = false;
     public boolean headlessPistonMode = false;
     public boolean hello = true;
+    public boolean blinkDuringTasksTick = false;
     public int pingSpikeThreshold = 0;
     public PowerBlockType powerBlockUsage = PowerBlockType.Both;
     public DistanceCalculationMode distanceCalculationMode = DistanceCalculationMode.currentClientVersion;
@@ -162,6 +163,7 @@ public class Config {
             // 默认隐藏hello选项，这样用户无法通过正常方式影响hello包的发送
             if (!config.hello)
                 out.name("hello").value(config.hello);
+            out.name("blink-during-tasks-tick").value(config.blinkDuringTasksTick);
             out.name("ping-spike-threshold").value(config.pingSpikeThreshold);
             out.name("power-block-usage").value(config.powerBlockUsage.toString());
             out.name("distance-calculation-mode").value(config.distanceCalculationMode.toString());
@@ -207,6 +209,10 @@ public class Config {
                         }
                         case "hello": {
                             config.hello = in.nextBoolean();
+                            break;
+                        }
+                        case "blink-during-tasks-tick": {
+                            config.blinkDuringTasksTick = in.nextBoolean();
                             break;
                         }
                         case "ping-spike-threshold": {

@@ -2,15 +2,28 @@ package me.z7087.blockminer.task;
 
 import me.z7087.blockminer.BlockMinerMod;
 import me.z7087.blockminer.I18n;
+import me.z7087.blockminer.util.BlinkUtils;
 import me.z7087.blockminer.util.MessageUtils;
 import me.z7087.blockminer.util.enums.TaskState;
 import net.minecraft.block.Block;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.client.world.ClientWorld;
+import net.minecraft.network.ClientConnection;
 import net.minecraft.util.math.BlockPos;
 
 import java.lang.ref.WeakReference;
 import java.util.*;
+
+// 单方块方案：
+// 先拿到所有可能的活塞能源方块放置方法
+// 预先按：俩都行-红石火把-拉杆；无需额外方块-需要额外方块；排序，从目标方块开始从内向外遍历曼哈顿距离<=4的方块，对每个方块遍历那个set，方块属性不通过就移除
+// --
+// 多方块方案：
+// 在addAura的时候尝试为群体添加task，尽量让一个信号源激活多个活塞
+// --
+// 其他：
+// 使用其他更简单的搜索算法，用无法涵盖所有情况换取高搜索性能
 
 public class TaskManager {
     private boolean enabled = false;
@@ -21,7 +34,8 @@ public class TaskManager {
         BlockMinerMod.INSTANCE.rotationUtils.resetRotationIfNoKeepRotation();
         if (!enabled)
             return;
-        if (MinecraftClient.getInstance().player == null) {
+        final ClientPlayerEntity player = MinecraftClient.getInstance().player;
+        if (player == null) {
             return;
         }
         final ClientWorld world = MinecraftClient.getInstance().world;
@@ -37,16 +51,27 @@ public class TaskManager {
                 return;
             }
         }
-        final Iterator<Task> taskIterator = taskQueue.iterator();
-        while (taskIterator.hasNext()) {
-            final Task task = taskIterator.next();
-            final boolean ignoreOtherTasks = task.tick();
-            if (task.state == TaskState.Finished) {
-                taskIterator.remove();
-                posSet.remove(task.targetPos);
+        final ClientConnection connection = player.networkHandler.getConnection();
+        final boolean startedBlinking = connection != null
+                && BlockMinerMod.INSTANCE.config.blinkDuringTasksTick
+                && !taskQueue.isEmpty()
+                && BlinkUtils.tryStartBlinking(connection);
+        try {
+            final Iterator<Task> taskIterator = taskQueue.iterator();
+            while (taskIterator.hasNext()) {
+                final Task task = taskIterator.next();
+                final boolean ignoreOtherTasks = task.tick();
+                if (task.state == TaskState.Finished) {
+                    taskIterator.remove();
+                    posSet.remove(task.targetPos);
+                }
+                if (ignoreOtherTasks)
+                    break;
             }
-            if (ignoreOtherTasks)
-                break;
+        } finally {
+            if (startedBlinking) {
+                BlinkUtils.tryStopBlinking(connection);
+            }
         }
     }
     public boolean handleAttackBlock(BlockPos blockPos) {

@@ -1,4 +1,4 @@
-package me.z7087.blockminer.mixin;
+package me.z7087.blockminer.mixin.minecraft.client;
 
 import me.z7087.blockminer.BlockMinerMod;
 import net.minecraft.client.MinecraftClient;

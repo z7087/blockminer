@@ -1,4 +1,4 @@
-package me.z7087.blockminer.mixin;
+package me.z7087.blockminer.mixin.minecraft.client.network;
 
 import net.minecraft.client.network.ClientPlayerInteractionManager;
 import net.minecraft.util.math.BlockPos;
