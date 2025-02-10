@@ -28,6 +28,7 @@ import net.minecraft.util.math.Vec3d;
 
 import java.util.*;
 
+// TODO 史山，等待重构
 public class Task implements Comparable<Task> {
     public final BlockPos targetPos;
     private int pistonIndex, dependBlockIndex;
