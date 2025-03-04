@@ -1,5 +1,6 @@
-package me.z7087.blockminer.util;
+package me.z7087.blockminer.util.finder;
 
+import me.z7087.blockminer.util.BlockUtils;
 import me.z7087.blockminer.util.data.Pair;
 import me.z7087.blockminer.util.data.PistonPowerInfo;
 import me.z7087.blockminer.util.enums.PowerBlockType;
@@ -8,31 +9,36 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
 import net.minecraft.world.World;
 
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 // TODO 史山，等待重构
 public final class BlockFinder {
     private BlockFinder() {}
 
     public static final Direction[] DIRECTIONS = Direction.values();
-    private static final Direction[][] POSSIBLE_FACE_DIRECTIONS;
+    public static final Direction[][] DIRECTIONS_WITHOUT;
+    public static final Direction[][] POSSIBLE_FACE_DIRECTIONS;
     static {
-        Direction[] directions = Direction.values();
-        POSSIBLE_FACE_DIRECTIONS = new Direction[directions.length][directions.length - 1];
-        for (int i = 0, length = directions.length; i < length; ++i) {
-            Direction back = directions[i].getOpposite();
-            for (int j = 0, k = 0; j < length; j++) {
-                Direction face = directions[j];
-                if (face != back) {
-                    POSSIBLE_FACE_DIRECTIONS[i][k++] = face;
+        Direction[] DIRECTIONS = BlockFinder.DIRECTIONS;
+        final int DirectionsCount = DIRECTIONS.length;
+        DIRECTIONS_WITHOUT = new Direction[DirectionsCount][DirectionsCount - 1];
+        for (int i = 0; i < DirectionsCount; ++i) {
+            Direction direction = DIRECTIONS[i];
+            for (int j = 0, k = 0; j < DirectionsCount; j++) {
+                Direction anotherDirection = DIRECTIONS[j];
+                if (anotherDirection != direction) {
+                    DIRECTIONS_WITHOUT[i][k++] = anotherDirection;
                 }
             }
         }
+        POSSIBLE_FACE_DIRECTIONS = new Direction[DirectionsCount][DirectionsCount - 1];
+        for (Direction direction : DIRECTIONS) {
+            POSSIBLE_FACE_DIRECTIONS[direction.getOpposite().ordinal()] = DIRECTIONS_WITHOUT[direction.ordinal()];
+        }
     }
-    private static final Direction[] DIRECTIONS_WITHOUT_DOWN = POSSIBLE_FACE_DIRECTIONS[Direction.DOWN.getOpposite().ordinal()];
-    private static final Direction[] DIRECTIONS_WITHOUT_UP = POSSIBLE_FACE_DIRECTIONS[Direction.UP.getOpposite().ordinal()];
+
+    private static final Direction[] DIRECTIONS_WITHOUT_DOWN = DIRECTIONS_WITHOUT[Direction.DOWN.ordinal()];
+    private static final Direction[] DIRECTIONS_WITHOUT_UP = DIRECTIONS_WITHOUT[Direction.UP.ordinal()];
 
     public static void findStablePistons(World world, BlockPos targetPos, List<Pair<BlockPos, Direction>> possiblePistonLocations) {
         BlockState stoneState = Blocks.STONE.getDefaultState();
@@ -60,7 +66,7 @@ public final class BlockFinder {
     }
 
     public static boolean isPistonPlaceSafe(World world, BlockPos pistonPos, Direction face) {
-        for (Direction direction : POSSIBLE_FACE_DIRECTIONS[face.getOpposite().ordinal()]) {
+        for (Direction direction : DIRECTIONS_WITHOUT[face.ordinal()]) {
             if (world.isEmittingRedstonePower(pistonPos.offset(direction), direction)) {
                 return false;
             }
@@ -97,6 +103,7 @@ public final class BlockFinder {
             for (Direction direction : DIRECTIONS) {
                 BlockPos powerBlockPos = pistonPos.offset(direction);
                 findPowerBlockForPistonInternal(deduplicationMapSolidDependBlock, deduplicationMapReplaceableDependBlock, world, powerBlockPos, pistonPos, pistonHeadPos, isRedstoneTorch, isLever, pistonFace);
+                // QC
                 powerBlockPos = powerBlockPos.up();
                 findPowerBlockForPistonInternal(deduplicationMapSolidDependBlock, deduplicationMapReplaceableDependBlock, world, powerBlockPos, pistonPos, pistonHeadPos, isRedstoneTorch, isLever, pistonFace);
             }
@@ -121,27 +128,61 @@ public final class BlockFinder {
                         findPowerBlockForPistonInternal2(deduplicationMapSolidDependBlock, deduplicationMapReplaceableDependBlock, world, dependDirection, dependBlockPos, isRedstoneTorch && !dependBlockPos.equals(pistonPos.up()), powerBlockPos, isLever, pistonPos, pistonFace);
                     }
                 }
-            } else if (powerBlockPosState.isSolidBlock(world, powerBlockPos) && !(powerBlockPosState.getBlock() instanceof PistonBlock)) {
-                // powerBlockPos现在是依赖方块了
-                for (Direction reversedDependDirection : DIRECTIONS) {
-                    BlockPos actualPowerBlockPos = powerBlockPos.offset(reversedDependDirection);
+            } else if (powerBlockPosState.isSolidBlock(world, powerBlockPos)) {
+                if (isLever) {
+                    // 原powerBlock现在是拉杆的依赖方块
+                    for (Direction facing : DIRECTIONS) {
+                        BlockPos actualPowerBlockPos = powerBlockPos.offset(facing);
+                        if (!actualPowerBlockPos.equals(pistonPos)
+                                && !actualPowerBlockPos.equals(pistonHeadPos)
+                                && world.isInBuildLimit(actualPowerBlockPos)
+                                && powerBlockPosState.isSideSolidFullSquare(world, powerBlockPos, facing)
+                                && BlockUtils.isReplaceable(world.getBlockState(actualPowerBlockPos))
+                        ) {
+                            findPowerBlockForPistonInternal2(deduplicationMapSolidDependBlock, deduplicationMapReplaceableDependBlock, world, facing.getOpposite(), powerBlockPos, false, actualPowerBlockPos, true, pistonPos, pistonFace);
+                        }
+                    }
+                }
+                if (isRedstoneTorch) {
+                    // 原powerBlock现在是红石火把上方的红石导体
+                    BlockPos actualPowerBlockPos = powerBlockPos.offset(Direction.DOWN);
                     if (!actualPowerBlockPos.equals(pistonPos)
                             && !actualPowerBlockPos.equals(pistonHeadPos)
                             && world.isInBuildLimit(actualPowerBlockPos)
-                            && powerBlockPosState.isSideSolidFullSquare(world, powerBlockPos, reversedDependDirection)
                             && BlockUtils.isReplaceable(world.getBlockState(actualPowerBlockPos))
                     ) {
-                        findPowerBlockForPistonInternal2(deduplicationMapSolidDependBlock, deduplicationMapReplaceableDependBlock, world, reversedDependDirection.getOpposite(), powerBlockPos, false, actualPowerBlockPos, isLever, pistonPos, pistonFace);
+                        for (Direction dependDirection : DIRECTIONS_WITHOUT_UP) {
+                            BlockPos dependBlockPos = actualPowerBlockPos.offset(dependDirection);
+                            BlockState dependBlockState;
+                            if (!dependBlockPos.equals(pistonPos)
+                                    && !dependBlockPos.equals(pistonHeadPos)
+                                    && world.isInBuildLimit(dependBlockPos)
+                                    && (BlockUtils.isReplaceable(dependBlockState = world.getBlockState(dependBlockPos)) || (dependBlockState.isSolidBlock(world, dependBlockPos) && dependBlockState.isSideSolidFullSquare(world, dependBlockPos, dependDirection.getOpposite())))
+                            ) {
+                                findPowerBlockForPistonInternal2(deduplicationMapSolidDependBlock, deduplicationMapReplaceableDependBlock, world, dependDirection, dependBlockPos, true, actualPowerBlockPos, false, pistonPos, pistonFace);
+                            }
+                        }
                     }
                 }
             }
         }
     }
 
-    private static void findPowerBlockForPistonInternal2(Map<PistonPowerInfo, PistonPowerInfo> deduplicationMapSolidDependBlock, Map<PistonPowerInfo, PistonPowerInfo> deduplicationMapReplaceableDependBlock, World world, Direction dependDirection, BlockPos dependBlockPos, boolean isRedstoneTorch, BlockPos powerBlockPos, boolean isLever, BlockPos pistonPos, Direction pistonFace) {
+    private static void findPowerBlockForPistonInternal2(
+            Map<PistonPowerInfo, PistonPowerInfo> deduplicationMapSolidDependBlock,
+            Map<PistonPowerInfo, PistonPowerInfo> deduplicationMapReplaceableDependBlock,
+            World world,
+            Direction dependDirection,
+            BlockPos dependBlockPos,
+            boolean isRedstoneTorch,
+            BlockPos powerBlockPos,
+            boolean isLever,
+            BlockPos pistonPos,
+            Direction pistonFace
+    ) {
         BlockState dependBlockState = world.getBlockState(dependBlockPos);
         final boolean dependBlockIsReplaceable = BlockUtils.isReplaceable(dependBlockState);
-        if ((dependBlockIsReplaceable && world.canPlace(Blocks.STONE.getDefaultState(), dependBlockPos, ShapeContext.absent())) || (dependBlockState.isSolidBlock(world, dependBlockPos) && dependBlockState.isSideSolidFullSquare(world, dependBlockPos, dependDirection.getOpposite()) && !(dependBlockState.getBlock() instanceof PistonBlock))) {
+        if ((dependBlockIsReplaceable && world.canPlace(Blocks.STONE.getDefaultState(), dependBlockPos, ShapeContext.absent())) || (dependBlockState.isSolidBlock(world, dependBlockPos) && dependBlockState.isSideSolidFullSquare(world, dependBlockPos, dependDirection.getOpposite()))) {
             boolean redstoneTorch = false;
             boolean lever = false;
             // 找到能源方块和其附着方向，检查会不会干扰其他task或被其他方块干扰
@@ -202,7 +243,7 @@ public final class BlockFinder {
                         }
                     }
                     // 如果红石火把能不依赖头顶的方块激活其他活塞，不能放置
-                    for (Direction direction1 : POSSIBLE_FACE_DIRECTIONS[dependDirection.getOpposite().ordinal()]) {
+                    for (Direction direction1 : DIRECTIONS_WITHOUT[dependDirection.ordinal()]) {
                         BlockPos pos = powerBlockPos.offset(direction1);
                         if (world.getBlockState(pos).getBlock() instanceof PistonBlock
                                 || world.getBlockState(pos.down()).getBlock() instanceof PistonBlock
@@ -244,7 +285,7 @@ public final class BlockFinder {
                         }
                     }
                     // 如果拉杆能不依赖所附着的方块激活其他活塞，不能放置
-                    for (Direction direction1 : POSSIBLE_FACE_DIRECTIONS[dependDirection.getOpposite().ordinal()]) {
+                    for (Direction direction1 : DIRECTIONS_WITHOUT[dependDirection.ordinal()]) {
                         BlockPos pos = powerBlockPos.offset(direction1);
                         if (world.getBlockState(pos).getBlock() instanceof PistonBlock
                                 || world.getBlockState(pos.down()).getBlock() instanceof PistonBlock

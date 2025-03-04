@@ -2,7 +2,6 @@ package me.z7087.blockminer.task;
 
 import me.z7087.blockminer.BlockMinerMod;
 import me.z7087.blockminer.mixin.minecraft.client.network.ClientPlayerInteractionManagerAccessor;
-import me.z7087.blockminer.util.BlockFinder;
 import me.z7087.blockminer.util.BlockUtils;
 import me.z7087.blockminer.util.InventoryUtils;
 import me.z7087.blockminer.util.RotationUtils;
@@ -10,6 +9,7 @@ import me.z7087.blockminer.util.data.Pair;
 import me.z7087.blockminer.util.data.PistonPowerInfo;
 import me.z7087.blockminer.util.enums.PowerBlockType;
 import me.z7087.blockminer.util.enums.TaskState;
+import me.z7087.blockminer.util.finder.BlockFinder;
 import net.minecraft.block.*;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
