@@ -52,7 +52,7 @@ public final class Command {
         builder
                 .then(literal("toggle")
                         .executes((context) -> {
-                            BlockMinerMod.INSTANCE.taskManager.toggle();
+                            BlockMinerMod.getInstance().taskManager.toggle();
                             return 1;
                         })
                 ).then(literal("config")
@@ -60,7 +60,7 @@ public final class Command {
                                 .executes(context -> {
                                     Config config = Config.loadFromFile();
                                     if (config != null) {
-                                        BlockMinerMod.INSTANCE.config = config;
+                                        BlockMinerMod.getInstance().config = config;
                                         return 1;
                                     }
                                     return 0;
@@ -68,7 +68,7 @@ public final class Command {
                         ).then(literal("save")
                                 .executes(context -> {
                                     try {
-                                        Config.saveToFile(BlockMinerMod.INSTANCE.config);
+                                        Config.saveToFile(BlockMinerMod.getInstance().config);
                                     } catch (IOException e) {
                                         throw new RuntimeException(e);
                                     }
@@ -76,24 +76,24 @@ public final class Command {
                                 })
                         ).then(literal("reset")
                                 .executes(context -> {
-                                    BlockMinerMod.INSTANCE.config = Config.createDefaultConfig();
-                                    BlockMinerMod.INSTANCE.tryToSaveConfig();
+                                    BlockMinerMod.getInstance().config = Config.createDefaultConfig();
+                                    BlockMinerMod.getInstance().tryToSaveConfig();
                                     return 1;
                                 })
                         )
                 ).then(literal("debug")
                         .executes((context) -> {
-                            context.getSource().sendFeedback(Text.of(String.valueOf(BlockMinerMod.INSTANCE.config.debug)));
+                            context.getSource().sendFeedback(Text.of(String.valueOf(BlockMinerMod.getInstance().config.debug)));
                             return 1;
                         })
                         .then(
                                 argument("bool", BoolArgumentType.bool())
                                         .executes(context -> {
-                                            Config config = BlockMinerMod.INSTANCE.config;
+                                            Config config = BlockMinerMod.getInstance().config;
                                             boolean input = BoolArgumentType.getBool(context, "bool");
                                             if (config.debug != input) {
                                                 config.debug = input;
-                                                BlockMinerMod.INSTANCE.tryToSaveConfig();
+                                                BlockMinerMod.getInstance().tryToSaveConfig();
                                                 return 1;
                                             }
                                             context.getSource().sendFeedback(Text.of("debug already set to " + input));
@@ -102,17 +102,17 @@ public final class Command {
                         )
                 ).then(literal("headless-piston-mode")
                         .executes((context) -> {
-                            context.getSource().sendFeedback(Text.of(String.valueOf(BlockMinerMod.INSTANCE.config.headlessPistonMode)));
+                            context.getSource().sendFeedback(Text.of(String.valueOf(BlockMinerMod.getInstance().config.headlessPistonMode)));
                             return 1;
                         })
                         .then(
                                 argument("bool", BoolArgumentType.bool())
                                         .executes(context -> {
-                                            Config config = BlockMinerMod.INSTANCE.config;
+                                            Config config = BlockMinerMod.getInstance().config;
                                             boolean input = BoolArgumentType.getBool(context, "bool");
                                             if (config.headlessPistonMode != input) {
                                                 config.headlessPistonMode = input;
-                                                BlockMinerMod.INSTANCE.tryToSaveConfig();
+                                                BlockMinerMod.getInstance().tryToSaveConfig();
                                                 return 1;
                                             }
                                             context.getSource().sendFeedback(Text.of("headless-piston-mode already set to " + input));
@@ -121,17 +121,17 @@ public final class Command {
                         )
                 ).then(literal("blink-during-tasks-tick")
                         .executes((context) -> {
-                            context.getSource().sendFeedback(Text.of(String.valueOf(BlockMinerMod.INSTANCE.config.blinkDuringTasksTick)));
+                            context.getSource().sendFeedback(Text.of(String.valueOf(BlockMinerMod.getInstance().config.blinkDuringTasksTick)));
                             return 1;
                         })
                         .then(
                                 argument("bool", BoolArgumentType.bool())
                                         .executes(context -> {
-                                            Config config = BlockMinerMod.INSTANCE.config;
+                                            Config config = BlockMinerMod.getInstance().config;
                                             boolean input = BoolArgumentType.getBool(context, "bool");
                                             if (config.blinkDuringTasksTick != input) {
                                                 config.blinkDuringTasksTick = input;
-                                                BlockMinerMod.INSTANCE.tryToSaveConfig();
+                                                BlockMinerMod.getInstance().tryToSaveConfig();
                                                 return 1;
                                             }
                                             context.getSource().sendFeedback(Text.of("blink-during-tasks-tick already set to " + input));
@@ -140,17 +140,17 @@ public final class Command {
                         )
                 ).then(literal("ping-spike-threshold")
                         .executes((context) -> {
-                            context.getSource().sendFeedback(Text.of(String.valueOf(BlockMinerMod.INSTANCE.config.pingSpikeThreshold)));
+                            context.getSource().sendFeedback(Text.of(String.valueOf(BlockMinerMod.getInstance().config.pingSpikeThreshold)));
                             return 1;
                         })
                         .then(
                                 argument("integer", IntegerArgumentType.integer(0, 1200))
                                         .executes(context -> {
-                                            Config config = BlockMinerMod.INSTANCE.config;
+                                            Config config = BlockMinerMod.getInstance().config;
                                             int input = IntegerArgumentType.getInteger(context, "integer");
                                             if (config.pingSpikeThreshold != input) {
                                                 config.pingSpikeThreshold = input;
-                                                BlockMinerMod.INSTANCE.tryToSaveConfig();
+                                                BlockMinerMod.getInstance().tryToSaveConfig();
                                                 return 1;
                                             }
                                             context.getSource().sendFeedback(Text.of("ping-spike-threshold already set to " + input));
@@ -159,15 +159,15 @@ public final class Command {
                         )
                 ).then(literal("power-block-usage")
                         .executes((context) -> {
-                            context.getSource().sendFeedback(Text.of(BlockMinerMod.INSTANCE.config.powerBlockUsage.toString()));
+                            context.getSource().sendFeedback(Text.of(BlockMinerMod.getInstance().config.powerBlockUsage.toString()));
                             return 1;
                         })
                         .then(literal("redstone-torch")
                                 .executes(context -> {
-                                    Config config = BlockMinerMod.INSTANCE.config;
+                                    Config config = BlockMinerMod.getInstance().config;
                                     if (config.powerBlockUsage != PowerBlockType.RedstoneTorch) {
                                         config.powerBlockUsage = PowerBlockType.RedstoneTorch;
-                                        BlockMinerMod.INSTANCE.tryToSaveConfig();
+                                        BlockMinerMod.getInstance().tryToSaveConfig();
                                         return 1;
                                     }
                                     context.getSource().sendFeedback(Text.of("ping-spike-threshold already set to \"redstone-torch\""));
@@ -175,10 +175,10 @@ public final class Command {
                                 })
                         ).then(literal("lever")
                                 .executes(context -> {
-                                    Config config = BlockMinerMod.INSTANCE.config;
+                                    Config config = BlockMinerMod.getInstance().config;
                                     if (config.powerBlockUsage != PowerBlockType.Lever) {
                                         config.powerBlockUsage = PowerBlockType.Lever;
-                                        BlockMinerMod.INSTANCE.tryToSaveConfig();
+                                        BlockMinerMod.getInstance().tryToSaveConfig();
                                         return 1;
                                     }
                                     context.getSource().sendFeedback(Text.of("ping-spike-threshold already set to \"lever\""));
@@ -186,10 +186,10 @@ public final class Command {
                                 })
                         ).then(literal("both")
                                 .executes(context -> {
-                                    Config config = BlockMinerMod.INSTANCE.config;
+                                    Config config = BlockMinerMod.getInstance().config;
                                     if (config.powerBlockUsage != PowerBlockType.Both) {
                                         config.powerBlockUsage = PowerBlockType.Both;
-                                        BlockMinerMod.INSTANCE.tryToSaveConfig();
+                                        BlockMinerMod.getInstance().tryToSaveConfig();
                                         return 1;
                                     }
                                     context.getSource().sendFeedback(Text.of("ping-spike-threshold already set to \"both\""));
@@ -198,15 +198,15 @@ public final class Command {
                         )
                 ).then(literal("distance-calculation-mode")
                         .executes((context) -> {
-                            context.getSource().sendFeedback(Text.of(BlockMinerMod.INSTANCE.config.distanceCalculationMode.toString()));
+                            context.getSource().sendFeedback(Text.of(BlockMinerMod.getInstance().config.distanceCalculationMode.toString()));
                             return 1;
                         })
                         .then(literal("old")
                                 .executes(context -> {
-                                    Config config = BlockMinerMod.INSTANCE.config;
+                                    Config config = BlockMinerMod.getInstance().config;
                                     if (config.distanceCalculationMode != DistanceCalculationMode.Old) {
                                         config.distanceCalculationMode = DistanceCalculationMode.Old;
-                                        BlockMinerMod.INSTANCE.tryToSaveConfig();
+                                        BlockMinerMod.getInstance().tryToSaveConfig();
                                         return 1;
                                     }
                                     context.getSource().sendFeedback(Text.of("distance-calculation-mode already set to \"old\""));
@@ -214,10 +214,10 @@ public final class Command {
                                 })
                         ).then(literal("1.19")
                                 .executes(context -> {
-                                    Config config = BlockMinerMod.INSTANCE.config;
+                                    Config config = BlockMinerMod.getInstance().config;
                                     if (config.distanceCalculationMode != DistanceCalculationMode.V1_19) {
                                         config.distanceCalculationMode = DistanceCalculationMode.V1_19;
-                                        BlockMinerMod.INSTANCE.tryToSaveConfig();
+                                        BlockMinerMod.getInstance().tryToSaveConfig();
                                         return 1;
                                     }
                                     context.getSource().sendFeedback(Text.of("distance-calculation-mode already set to \"1.19\""));
@@ -225,10 +225,10 @@ public final class Command {
                                 })
                         ).then(literal("1.20.6")
                                 .executes(context -> {
-                                    Config config = BlockMinerMod.INSTANCE.config;
+                                    Config config = BlockMinerMod.getInstance().config;
                                     if (config.distanceCalculationMode != DistanceCalculationMode.V1_20_6) {
                                         config.distanceCalculationMode = DistanceCalculationMode.V1_20_6;
-                                        BlockMinerMod.INSTANCE.tryToSaveConfig();
+                                        BlockMinerMod.getInstance().tryToSaveConfig();
                                         return 1;
                                     }
                                     context.getSource().sendFeedback(Text.of("distance-calculation-mode already set to \"1.20.6\""));
@@ -238,17 +238,17 @@ public final class Command {
                 ).then(literal("target-block")
                         .then(literal("whitelist")
                                 .executes((context) -> {
-                                    context.getSource().sendFeedback(Text.of(BlockMinerMod.INSTANCE.config.blockWhitelist.toString()));
+                                    context.getSource().sendFeedback(Text.of(BlockMinerMod.getInstance().config.blockWhitelist.toString()));
                                     return 1;
                                 })
                                 .then(literal("add")
                                         .then(
                                                 argument("block", getBlockStateArgumentType())
                                                         .executes(context -> {
-                                                            Config config = BlockMinerMod.INSTANCE.config;
+                                                            Config config = BlockMinerMod.getInstance().config;
                                                             Block input = context.getArgument("block", BlockStateArgument.class).getBlockState().getBlock();
                                                             if (config.blockWhitelist.add(input)) {
-                                                                BlockMinerMod.INSTANCE.tryToSaveConfig();
+                                                                BlockMinerMod.getInstance().tryToSaveConfig();
                                                                 return 1;
                                                             }
                                                             context.getSource().sendFeedback(Text.of("target-block whitelist already has " + input));
@@ -259,10 +259,10 @@ public final class Command {
                                         .then(
                                                 argument("block", getBlockStateArgumentType())
                                                         .executes(context -> {
-                                                            Config config = BlockMinerMod.INSTANCE.config;
+                                                            Config config = BlockMinerMod.getInstance().config;
                                                             Block input = context.getArgument("block", BlockStateArgument.class).getBlockState().getBlock();
                                                             if (config.blockWhitelist.remove(input)) {
-                                                                BlockMinerMod.INSTANCE.tryToSaveConfig();
+                                                                BlockMinerMod.getInstance().tryToSaveConfig();
                                                                 return 1;
                                                             }
                                                             context.getSource().sendFeedback(Text.of("target-block whitelist has no " + input));
@@ -274,17 +274,17 @@ public final class Command {
                 ).then(literal("depend-block")
                         .then(literal("whitelist")
                                 .executes((context) -> {
-                                    context.getSource().sendFeedback(Text.of(BlockMinerMod.INSTANCE.config.dependBlockWhitelistToString()));
+                                    context.getSource().sendFeedback(Text.of(BlockMinerMod.getInstance().config.dependBlockWhitelistToString()));
                                     return 1;
                                 })
                                 .then(literal("add")
                                         .then(
                                                 argument("block", getBlockStateArgumentType())
                                                         .executes(context -> {
-                                                            Config config = BlockMinerMod.INSTANCE.config;
+                                                            Config config = BlockMinerMod.getInstance().config;
                                                             Block input = context.getArgument("block", BlockStateArgument.class).getBlockState().getBlock();
                                                             if (config.dependBlockWhitelistAdd(input)) {
-                                                                BlockMinerMod.INSTANCE.tryToSaveConfig();
+                                                                BlockMinerMod.getInstance().tryToSaveConfig();
                                                                 return 1;
                                                             }
                                                             context.getSource().sendFeedback(Text.of("target-block whitelist already has " + input));
@@ -295,10 +295,10 @@ public final class Command {
                                         .then(
                                                 argument("block", getBlockStateArgumentType())
                                                         .executes(context -> {
-                                                            Config config = BlockMinerMod.INSTANCE.config;
+                                                            Config config = BlockMinerMod.getInstance().config;
                                                             Block input = context.getArgument("block", BlockStateArgument.class).getBlockState().getBlock();
                                                             if (config.dependBlockWhitelistRemove(input)) {
-                                                                BlockMinerMod.INSTANCE.tryToSaveConfig();
+                                                                BlockMinerMod.getInstance().tryToSaveConfig();
                                                                 return 1;
                                                             }
                                                             context.getSource().sendFeedback(Text.of("target-block whitelist has no " + input));
@@ -311,13 +311,13 @@ public final class Command {
                         .then(argument("start", BlockPosArgumentType.blockPos())
                                 .then(argument("end", BlockPosArgumentType.blockPos())
                                         .executes(context -> {
-                                            if (!BlockMinerMod.INSTANCE.config.debug) {
+                                            if (!BlockMinerMod.getInstance().config.debug) {
                                                 context.getSource().sendFeedback(Text.of("debug not enabled"));
                                                 return 0;
                                             }
                                             final BlockPos start = BlockPosArgumentType.getBlockPos(context, "start");
                                             final BlockPos end = BlockPosArgumentType.getBlockPos(context, "end");
-                                            return BlockMinerMod.INSTANCE.taskManager.addAura(start, end) ? 1 : 0;
+                                            return BlockMinerMod.getInstance().taskManager.addAura(start, end) ? 1 : 0;
                                         })
                                 )
                         )

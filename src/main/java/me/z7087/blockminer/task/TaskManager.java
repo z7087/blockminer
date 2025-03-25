@@ -31,7 +31,7 @@ public class TaskManager {
     private final Set<BlockPos> posSet = new HashSet<>();
     private final LinkedList<Task> taskQueue = new LinkedList<>();
     public void tick() {
-        BlockMinerMod.INSTANCE.rotationUtils.resetRotationIfNoKeepRotation();
+        BlockMinerMod.getInstance().rotationUtils.resetRotationIfNoKeepRotation();
         if (!enabled)
             return;
         final ClientPlayerEntity player = MinecraftClient.getInstance().player;
@@ -53,7 +53,7 @@ public class TaskManager {
         }
         final ClientConnection connection = player.networkHandler.getConnection();
         final boolean startedBlinking = connection != null
-                && BlockMinerMod.INSTANCE.config.blinkDuringTasksTick
+                && BlockMinerMod.getInstance().config.blinkDuringTasksTick
                 && !taskQueue.isEmpty()
                 && BlinkUtils.tryStartBlinking(connection);
         try {
@@ -78,7 +78,7 @@ public class TaskManager {
         if (!enabled)
             return false;
         final ClientWorld world = Objects.requireNonNull(MinecraftClient.getInstance().world);
-        if (!BlockMinerMod.INSTANCE.config.blockWhitelist.contains(world.getBlockState(blockPos).getBlock()))
+        if (!BlockMinerMod.getInstance().config.blockWhitelist.contains(world.getBlockState(blockPos).getBlock()))
             return false;
         if (posSet.contains(blockPos))
             return false;
@@ -89,14 +89,14 @@ public class TaskManager {
     }
     public boolean handleUseOnBlock(BlockPos targetBlock) {
         final ClientWorld world = Objects.requireNonNull(MinecraftClient.getInstance().world);
-        if (!BlockMinerMod.INSTANCE.config.blockWhitelist.contains(world.getBlockState(targetBlock).getBlock()))
+        if (!BlockMinerMod.getInstance().config.blockWhitelist.contains(world.getBlockState(targetBlock).getBlock()))
             return false;
         toggle();
         return true;
     }
 
     public boolean addAura(BlockPos start, BlockPos end) {
-        final Set<Block> whitelist = BlockMinerMod.INSTANCE.config.blockWhitelist;
+        final Set<Block> whitelist = BlockMinerMod.getInstance().config.blockWhitelist;
         ClientWorld world = Objects.requireNonNull(MinecraftClient.getInstance().world);
         Iterator<BlockPos> iterator = BlockPos.iterate(start, end).iterator();
         while (iterator.hasNext()) {
@@ -159,7 +159,7 @@ public class TaskManager {
         this.enabled = false;
         //this.prevWorldRef = null;
         clearTasks();
-        BlockMinerMod.INSTANCE.rotationUtils.forceClearRotations();
-        BlockMinerMod.INSTANCE.blockBreakUtils.setBreaking(false);
+        BlockMinerMod.getInstance().rotationUtils.forceClearRotations();
+        BlockMinerMod.getInstance().blockBreakUtils.setBreaking(false);
     }
 }

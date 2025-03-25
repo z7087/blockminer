@@ -26,7 +26,7 @@ public abstract class MixinClientPlayerEntity {
     //$$ )
     //#endif
     private float onGetYaw(ClientPlayerEntity player) {
-        Rotation rotation = BlockMinerMod.INSTANCE.rotationUtils.getRotation();
+        Rotation rotation = BlockMinerMod.getInstance().rotationUtils.getRotation();
         if (rotation.hasYaw())
             return rotation.getYaw();
         //#if MC >= 11700
@@ -53,7 +53,7 @@ public abstract class MixinClientPlayerEntity {
     //$$ )
     //#endif
     private float onGetPitch(ClientPlayerEntity player) {
-        Rotation rotation = BlockMinerMod.INSTANCE.rotationUtils.getRotation();
+        Rotation rotation = BlockMinerMod.getInstance().rotationUtils.getRotation();
         if (rotation.hasPitch())
             return rotation.getPitch();
         //#if MC >= 11700
