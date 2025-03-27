@@ -18,7 +18,6 @@ import net.minecraft.client.world.ClientWorld;
 import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
-import net.minecraft.item.PickaxeItem;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
 import net.minecraft.util.hit.BlockHitResult;
@@ -91,7 +90,7 @@ public class Task implements Comparable<Task> {
                         PowerBlockType powerBlockUsage = BlockMinerMod.getInstance().config.powerBlockUsage;
                         pickaxeIndex = InventoryUtils.findBestItemInHotbar(inventory,
                                 (stack ->
-                                        stack.getItem() instanceof PickaxeItem
+                                        InventoryUtils.isPickaxe(stack)
                                                 && (stack.getMaxDamage() - stack.getDamage() >= 5)
                                 ),
                                 ((stack1, stack2) -> {
@@ -345,7 +344,7 @@ public class Task implements Comparable<Task> {
                 }
                 case SelectPickaxeAndReadyMine: {
                     if (pickaxeIndex != -1) {
-                        inventory.selectedSlot = pickaxeIndex;
+                        InventoryUtils.setSelectedSlot(inventory, pickaxeIndex);
                         ((ClientPlayerInteractionManagerAccessor) interactionManager).invokeSyncSelectedSlot();
                     }
                     Direction pistonToTargetBlockFace = null;
@@ -424,7 +423,7 @@ public class Task implements Comparable<Task> {
                     if (getWaitTicksAfterDecrement() > 0) {
                         rotationUtils.markKeepRotation();
                         if (pickaxeIndex != -1) {
-                            inventory.selectedSlot = pickaxeIndex;
+                            InventoryUtils.setSelectedSlot(inventory, pickaxeIndex);
                             ((ClientPlayerInteractionManagerAccessor) interactionManager).invokeSyncSelectedSlot();
                         }
                         break loop;
@@ -434,7 +433,7 @@ public class Task implements Comparable<Task> {
                 }
                 case Execute: {
                     if (pickaxeIndex != -1) {
-                        inventory.selectedSlot = pickaxeIndex;
+                        InventoryUtils.setSelectedSlot(inventory, pickaxeIndex);
                         ((ClientPlayerInteractionManagerAccessor) interactionManager).invokeSyncSelectedSlot();
                     }
                     if (!BlockUtils.playerCanTouchServerside(player, pistonPowerInfo.pistonPos, 1, true)) {

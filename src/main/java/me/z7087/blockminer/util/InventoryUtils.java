@@ -1,6 +1,5 @@
 package me.z7087.blockminer.util;
 
-import net.minecraft.block.BambooBlock;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
@@ -15,7 +14,6 @@ import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
-import net.minecraft.item.SwordItem;
 import net.minecraft.registry.tag.FluidTags;
 import net.minecraft.screen.slot.SlotActionType;
 import net.minecraft.util.collection.DefaultedList;
@@ -36,8 +34,32 @@ public final class InventoryUtils {
 
     private InventoryUtils() {}
 
+    public static DefaultedList<ItemStack> getMainStacks(PlayerInventory inventory) {
+        //#if MC >= 12105
+        //$$ return inventory.getMainStacks();
+        //#else
+        return inventory.main;
+        //#endif
+    }
+
+    public static int getSelectedSlot(PlayerInventory inventory) {
+        //#if MC >= 12105
+        //$$ return inventory.getSelectedSlot();
+        //#else
+        return inventory.selectedSlot;
+        //#endif
+    }
+
+    public static void setSelectedSlot(PlayerInventory inventory, int slot) {
+        //#if MC >= 12105
+        //$$ inventory.setSelectedSlot(slot);
+        //#else
+        inventory.selectedSlot = slot;
+        //#endif
+    }
+
     public static int findFirstItemInHotbar(PlayerInventory inventory, Item item) {
-        DefaultedList<ItemStack> main = inventory.main;
+        DefaultedList<ItemStack> main = getMainStacks(inventory);
         for (int i = 0, size = PlayerInventory.getHotbarSize(); i < size; ++i) {
             ItemStack stack = main.get(i);
             if (stack.getItem() == item) {
@@ -47,7 +69,7 @@ public final class InventoryUtils {
         return -1;
     }
     public static int findFirstItemInHotbar(PlayerInventory inventory, Predicate<ItemStack> predicate) {
-        DefaultedList<ItemStack> main = inventory.main;
+        DefaultedList<ItemStack> main = getMainStacks(inventory);
         for (int i = 0, size = PlayerInventory.getHotbarSize(); i < size; ++i) {
             ItemStack stack = main.get(i);
             if (predicate.test(stack)) {
@@ -57,7 +79,7 @@ public final class InventoryUtils {
         return -1;
     }
     public static int findFirstItemInHotbar(PlayerInventory inventory, Item item, Predicate<ItemStack> predicate) {
-        DefaultedList<ItemStack> main = inventory.main;
+        DefaultedList<ItemStack> main = getMainStacks(inventory);
         for (int i = 0, size = PlayerInventory.getHotbarSize(); i < size; ++i) {
             ItemStack stack = main.get(i);
             if (stack.getItem() == item && predicate.test(stack)) {
@@ -67,7 +89,7 @@ public final class InventoryUtils {
         return -1;
     }
     public static int findFirstItem(PlayerInventory inventory, Item item) {
-        DefaultedList<ItemStack> main = inventory.main;
+        DefaultedList<ItemStack> main = getMainStacks(inventory);
         for (int i = 0, size = main.size(); i < size; ++i) {
             ItemStack stack = main.get(i);
             if (stack.getItem() == item) {
@@ -77,7 +99,7 @@ public final class InventoryUtils {
         return -1;
     }
     public static int findFirstItem(PlayerInventory inventory, Predicate<ItemStack> predicate) {
-        DefaultedList<ItemStack> main = inventory.main;
+        DefaultedList<ItemStack> main = getMainStacks(inventory);
         for (int i = 0, size = main.size(); i < size; ++i) {
             ItemStack stack = main.get(i);
             if (predicate.test(stack)) {
@@ -87,7 +109,7 @@ public final class InventoryUtils {
         return -1;
     }
     public static int findFirstItem(PlayerInventory inventory, Item item, Predicate<ItemStack> predicate) {
-        DefaultedList<ItemStack> main = inventory.main;
+        DefaultedList<ItemStack> main = getMainStacks(inventory);
         for (int i = 0, size = main.size(); i < size; ++i) {
             ItemStack stack = main.get(i);
             if (stack.getItem() == item && predicate.test(stack)) {
@@ -97,7 +119,7 @@ public final class InventoryUtils {
         return -1;
     }
     public static int findBestItemInHotbar(PlayerInventory inventory, Predicate<ItemStack> predicate, Comparator<ItemStack> comparator) {
-        DefaultedList<ItemStack> main = inventory.main;
+        DefaultedList<ItemStack> main = getMainStacks(inventory);
         for (int i = 0, size = PlayerInventory.getHotbarSize(); i < size; ++i) {
             ItemStack bestStack = main.get(i);
             if (predicate.test(bestStack)) {
@@ -115,7 +137,7 @@ public final class InventoryUtils {
         return -1;
     }
     public static int findBestItem(PlayerInventory inventory, Predicate<ItemStack> predicate, Comparator<ItemStack> comparator) {
-        DefaultedList<ItemStack> main = inventory.main;
+        DefaultedList<ItemStack> main = getMainStacks(inventory);
         for (int i = 0, size = main.size(); i < size; ++i) {
             ItemStack bestStack = main.get(i);
             if (predicate.test(bestStack)) {
@@ -149,7 +171,7 @@ public final class InventoryUtils {
         if (player.currentScreenHandler != player.playerScreenHandler)
             throw new IllegalStateException("player.currentScreenHandler != player.playerScreenHandler");
         if (!inventory.getMainHandStack().isEmpty() && player.isSneaking()) {
-            int oldIndex = inventory.selectedSlot;
+            int oldIndex = getSelectedSlot(inventory);
             int newIndex = findFirstItemInHotbar(inventory, ItemStack::isEmpty);
             if (newIndex == -1)
                 throw new IllegalStateException("full hotbar");
@@ -171,9 +193,16 @@ public final class InventoryUtils {
      */
     public static float calcBlockBreakingDelta(ClientPlayerEntity player, BlockState blockState, ItemStack itemStack) {
         // 硬编码的
-        if (itemStack.getItem() instanceof SwordItem && blockState.getBlock() instanceof BambooBlock) {
+        //#if MC <= 12104
+        if (itemStack.getItem() instanceof net.minecraft.item.SwordItem &&
+                (
+                        blockState.getBlock() instanceof net.minecraft.block.BambooBlock
+                                || blockState.getBlock() instanceof net.minecraft.block.BambooShootBlock
+                )
+        ) {
             return 1F;
         }
+        //#endif
         float hardness = BlockUtils.getHardness(blockState);
         if (hardness < 0)
             return 0;
@@ -250,5 +279,13 @@ public final class InventoryUtils {
             f /= 5.0F;
         }
         return f / hardness / (float) i;
+    }
+
+    public static boolean isPickaxe(ItemStack stack) {
+        //#if MC >= 12104
+        return stack.isIn(net.minecraft.registry.tag.ItemTags.PICKAXES);
+        //#else
+        //$$ return stack.getItem() instanceof net.minecraft.item.PickaxeItem;
+        //#endif
     }
 }
