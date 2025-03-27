@@ -43,6 +43,7 @@ dependencies {
 //	include(annotationProcessor(implementation("io.github.llamalad7:mixinextras-fabric:${project.mixinextras_version}")))
 }
 
+JavaVersion MIN_JAVA_COMPATIBILITY = JavaVersion.VERSION_1_8
 JavaVersion JAVA_COMPATIBILITY
 if (mcVersion >= 12005) {
     JAVA_COMPATIBILITY = JavaVersion.VERSION_21
@@ -57,6 +58,22 @@ JavaVersion MIXIN_COMPATIBILITY_LEVEL = JAVA_COMPATIBILITY
 
 loom {
     def commonVmArgs = ['-Dmixin.debug.export=true', '-Dmixin.debug.countInjections=true']
+    commonVmArgs += '-XX:+UnlockExperimentalVMOptions'
+    commonVmArgs += '-XX:+TrustFinalNonStaticFields'
+    if (JAVA_COMPATIBILITY.isCompatibleWith(JavaVersion.VERSION_15)) {
+        //commonVmArgs += '-XX:+UseZGC'
+        //if (JAVA_COMPATIBILITY.isCompatibleWith(JavaVersion.VERSION_21))
+        //    commonVmArgs += '-XX:+ZGenerational'
+        commonVmArgs += '-XX:+UseG1GC'
+        commonVmArgs += '-XX:+UseStringDeduplication'
+        commonVmArgs += '-XX:+OptimizeStringConcat'
+        commonVmArgs += '-XX:MaxGCPauseMillis=150'
+    } else {
+        commonVmArgs += '-XX:+UseG1GC'
+        commonVmArgs += '-XX:+UseStringDeduplication'
+        commonVmArgs += '-XX:+OptimizeStringConcat'
+        commonVmArgs += '-XX:MaxGCPauseMillis=150'
+    }
     runConfigs.configureEach {
         // to make sure it generates all "Minecraft Client (:subproject_name)" applications
         ideConfigGenerated = true
@@ -125,14 +142,14 @@ processResources {
 tasks.withType(JavaCompile).configureEach {
     options.encoding = "UTF-8"
     options.compilerArgs << "-Xlint:deprecation" << "-Xlint:unchecked"
-    if (JAVA_COMPATIBILITY <= JavaVersion.VERSION_1_8) {
+    if (MIN_JAVA_COMPATIBILITY <= JavaVersion.VERSION_1_8) {
         // suppressed "source/target value 8 is obsolete and will be removed in a future release"
         options.compilerArgs << '-Xlint:-options'
     }
 }
 
 java {
-    sourceCompatibility = JAVA_COMPATIBILITY
+    sourceCompatibility = MIN_JAVA_COMPATIBILITY
     targetCompatibility = JAVA_COMPATIBILITY
 
     // Loom will automatically attach sourcesJar to a RemapSourcesJar task and to the "build" task
