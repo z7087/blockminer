@@ -31,6 +31,7 @@ preprocess {
     def mc_1_21_5 = createNode('1.21.5', 1_21_05, '')
 
     // back
+    mc_1_21_5.link(mc_1_21_4, null)
     mc_1_21_4.link(mc_1_21_3, null)
     mc_1_21_3.link(mc_1_21_1, null)
     mc_1_21_1.link(mc_1_20_6, null)
@@ -50,7 +51,8 @@ preprocess {
 //    mc_1_15_2.link(mc_1_14_4 , null)
 
     // forward
-    mc_1_21_4.link(mc_1_21_5, null)
+    // nope.
+//    mc_1_21_4.link(mc_1_21_5, null)
 }
 
 tasks.register('buildAndGather') {

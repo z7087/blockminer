@@ -7,29 +7,73 @@ import org.spongepowered.asm.mixin.gen.Invoker;
 
 @Mixin(ClientPlayerEntity.class)
 public interface ClientPlayerEntityAccessor {
-    @Accessor
+    @Accessor(
+            //#if MC >= 12105
+            "lastXClient"
+            //#endif
+    )
     double getLastX();
-    @Accessor
+    @Accessor(
+            //#if MC >= 12105
+            "lastXClient"
+            //#endif
+    )
     void setLastX(double lastX);
 
-    @Accessor
-    double getLastBaseY();
-    @Accessor
-    void setLastBaseY(double lastBaseY);
+    @Accessor(
+            //#if MC >= 12105
+            "lastYClient"
+            //#else
+            //$$ "lastBaseY"
+            //#endif
+    )
+    double getLastY();
+    @Accessor(
+            //#if MC >= 12105
+            "lastYClient"
+            //#else
+            //$$ "lastBaseY"
+            //#endif
+    )
+    void setLastY(double lastY);
 
-    @Accessor
+    @Accessor(
+            //#if MC >= 12105
+            "lastZClient"
+            //#endif
+    )
     double getLastZ();
-    @Accessor
+    @Accessor(
+            //#if MC >= 12105
+            "lastZClient"
+            //#endif
+    )
     void setLastZ(double lastZ);
 
-    @Accessor
+    @Accessor(
+            //#if MC >= 12105
+            "lastYawClient"
+            //#endif
+    )
     float getLastYaw();
-    @Accessor
+    @Accessor(
+            //#if MC >= 12105
+            "lastYawClient"
+            //#endif
+    )
     void setLastYaw(float lastYaw);
 
-    @Accessor
+    @Accessor(
+            //#if MC >= 12105
+            "lastPitchClient"
+            //#endif
+    )
     float getLastPitch();
-    @Accessor
+    @Accessor(
+            //#if MC >= 12105
+            "lastPitchClient"
+            //#endif
+    )
     void setLastPitch(float lastPitch);
 
     @Accessor

@@ -36,25 +36,25 @@ public final class InventoryUtils {
 
     public static DefaultedList<ItemStack> getMainStacks(PlayerInventory inventory) {
         //#if MC >= 12105
-        //$$ return inventory.getMainStacks();
+        return inventory.getMainStacks();
         //#else
-        return inventory.main;
+        //$$ return inventory.main;
         //#endif
     }
 
     public static int getSelectedSlot(PlayerInventory inventory) {
         //#if MC >= 12105
-        //$$ return inventory.getSelectedSlot();
+        return inventory.getSelectedSlot();
         //#else
-        return inventory.selectedSlot;
+        //$$ return inventory.selectedSlot;
         //#endif
     }
 
     public static void setSelectedSlot(PlayerInventory inventory, int slot) {
         //#if MC >= 12105
-        //$$ inventory.setSelectedSlot(slot);
+        inventory.setSelectedSlot(slot);
         //#else
-        inventory.selectedSlot = slot;
+        //$$ inventory.selectedSlot = slot;
         //#endif
     }
 
@@ -170,7 +170,7 @@ public final class InventoryUtils {
     public static <T> T useEmptyMainHandIfSneakingDuring(ClientPlayerEntity player, PlayerInventory inventory, Supplier<T> supplier) {
         if (player.currentScreenHandler != player.playerScreenHandler)
             throw new IllegalStateException("player.currentScreenHandler != player.playerScreenHandler");
-        if (!inventory.getMainHandStack().isEmpty() && player.isSneaking()) {
+        if (!inventory.getSelectedStack().isEmpty() && player.isSneaking()) {
             int oldIndex = getSelectedSlot(inventory);
             int newIndex = findFirstItemInHotbar(inventory, ItemStack::isEmpty);
             if (newIndex == -1)
@@ -194,14 +194,14 @@ public final class InventoryUtils {
     public static float calcBlockBreakingDelta(ClientPlayerEntity player, BlockState blockState, ItemStack itemStack) {
         // 硬编码的
         //#if MC <= 12104
-        if (itemStack.getItem() instanceof net.minecraft.item.SwordItem &&
-                (
-                        blockState.getBlock() instanceof net.minecraft.block.BambooBlock
-                                || blockState.getBlock() instanceof net.minecraft.block.BambooShootBlock
-                )
-        ) {
-            return 1F;
-        }
+        //$$ if (itemStack.getItem() instanceof net.minecraft.item.SwordItem &&
+        //$$         (
+        //$$                 blockState.getBlock() instanceof net.minecraft.block.BambooBlock
+        //$$                         || blockState.getBlock() instanceof net.minecraft.block.BambooShootBlock
+        //$$         )
+        //$$ ) {
+        //$$     return 1F;
+        //$$ }
         //#endif
         float hardness = BlockUtils.getHardness(blockState);
         if (hardness < 0)

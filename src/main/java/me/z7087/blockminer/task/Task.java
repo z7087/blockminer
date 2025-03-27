@@ -395,7 +395,7 @@ public class Task implements Comparable<Task> {
                             break loop;
                         }
                     }
-                    blockBreakingDelta = InventoryUtils.calcBlockBreakingDelta(player, Blocks.PISTON.getDefaultState(), inventory.getMainHandStack());
+                    blockBreakingDelta = InventoryUtils.calcBlockBreakingDelta(player, Blocks.PISTON.getDefaultState(), inventory.getSelectedStack());
                     if (blockBreakingDelta < 1) {
                         if (blockBreakingDelta < 0.7 && redstoneTorchIndex != -1) {
                             // 挖得太慢了，破不了，回去重试
