@@ -7,6 +7,8 @@ import com.google.gson.stream.MalformedJsonException;
 import me.z7087.blockminer.BlockMinerMod;
 import me.z7087.blockminer.util.enums.DistanceCalculationMode;
 import me.z7087.blockminer.util.enums.PowerBlockType;
+import me.z7087.final2constant.Constant;
+import me.z7087.final2constant.DynamicConstant;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
@@ -14,12 +16,15 @@ import net.minecraft.item.Item;
 import net.minecraft.item.Items;
 import net.minecraft.registry.Registries;
 import net.minecraft.util.Identifier;
+import org.objectweb.asm.Type;
 
 import java.io.*;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
 import java.util.HashSet;
 import java.util.Set;
 
-public class Config {
+public abstract class Config {
     public static final File PATH_CONFIG = new File(FabricLoader.getInstance().getConfigDir().toFile(), BlockMinerMod.MOD_ID + ".json");
     public static final Gson GSON;
     static {
@@ -28,62 +33,127 @@ public class Config {
                 .setPrettyPrinting()
                 .create();
     }
-    public boolean debug = false;
-    public boolean headlessPistonMode = false;
-    public boolean hello = true;
-    public boolean blinkDuringTasksTick = false;
-    public int pingSpikeThreshold = 0;
-    public PowerBlockType powerBlockUsage = PowerBlockType.Both;
-    public DistanceCalculationMode distanceCalculationMode = DistanceCalculationMode.currentClientVersion;
-    public final Set<Block> blockWhitelist = new HashSet<>();
+    private Config() {}
 
-    private final Set<Block> dependBlockWhitelist = new HashSet<>();
-    private final transient Set<Item> dependBlockItemWhitelist = new HashSet<>();
+    private static final MethodHandle CONSTRUCTOR = Constant.factory.ofRecordConstructor(
+            MethodHandles.lookup(),
+            Config.class,
+            false,
+            new String[] {
+                    "debug",
+                    "headlessPistonMode",
+                    "hello",
+                    "blinkDuringTasksTick",
+                    "pingSpikeThreshold",
+                    "powerBlockUsage",
+                    "distanceCalculationMode",
+                    "blockWhitelist",
+                    "dependBlockWhitelist",
+                    "dependBlockItemWhitelist"
+            },
+            new String[] {
+                    Type.getDescriptor(DynamicConstant.class),
+                    Type.getDescriptor(DynamicConstant.class),
+                    Type.getDescriptor(DynamicConstant.class),
+                    Type.getDescriptor(DynamicConstant.class),
+                    Type.getDescriptor(DynamicConstant.class),
+                    Type.getDescriptor(DynamicConstant.class),
+                    Type.getDescriptor(DynamicConstant.class),
+                    Type.getDescriptor(Set.class),
+                    Type.getDescriptor(Set.class),
+                    Type.getDescriptor(Set.class)
+            },
+            null,
+            null,
+            true,
+            false
+    );
+
+    public static Config createInstance() {
+        final DynamicConstant<Boolean> debug = Constant.factory.ofMutable(false);
+        final DynamicConstant<Boolean> headlessPistonMode = Constant.factory.ofMutable(false);
+        final DynamicConstant<Boolean> hello = Constant.factory.ofMutable(true);
+        final DynamicConstant<Boolean> blinkDuringTasksTick = Constant.factory.ofMutable(false);
+        final DynamicConstant<Integer> pingSpikeThreshold = Constant.factory.ofMutable(0);
+        final DynamicConstant<PowerBlockType> powerBlockUsage = Constant.factory.ofMutable(PowerBlockType.Both);
+        final DynamicConstant<DistanceCalculationMode> distanceCalculationMode = Constant.factory.ofMutable(DistanceCalculationMode.currentClientVersion);
+        final Set<Block> blockWhitelist = new HashSet<>();
+
+        final Set<Block> dependBlockWhitelist = new HashSet<>();
+        final Set<Item> dependBlockItemWhitelist = new HashSet<>();
+        try {
+            return (Config) CONSTRUCTOR.invokeExact(
+                    debug,
+                    headlessPistonMode,
+                    hello,
+                    blinkDuringTasksTick,
+                    pingSpikeThreshold,
+                    powerBlockUsage,
+                    distanceCalculationMode,
+                    blockWhitelist,
+                    dependBlockWhitelist,
+                    dependBlockItemWhitelist
+            );
+        } catch (Throwable e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    abstract DynamicConstant<Boolean> debug();
+    abstract DynamicConstant<Boolean> headlessPistonMode();
+    abstract DynamicConstant<Boolean> hello();
+    abstract DynamicConstant<Boolean> blinkDuringTasksTick();
+    abstract DynamicConstant<Integer> pingSpikeThreshold();
+    abstract DynamicConstant<PowerBlockType> powerBlockUsage();
+    abstract DynamicConstant<DistanceCalculationMode> distanceCalculationMode();
+    public abstract Set<Block> blockWhitelist();
+
+    public abstract Set<Block> dependBlockWhitelist();
+    public abstract Set<Item> dependBlockItemWhitelist();
 
     public String dependBlockWhitelistToString() {
-        return dependBlockWhitelist.toString();
+        return dependBlockWhitelist().toString();
     }
 
     public boolean dependBlockWhitelistContains(Block block) {
-        return dependBlockWhitelist.contains(block);
+        return dependBlockWhitelist().contains(block);
     }
 
     public boolean dependBlockWhitelistContains(Item item) {
-        return dependBlockItemWhitelist.contains(item);
+        return dependBlockItemWhitelist().contains(item);
     }
 
     public boolean dependBlockWhitelistAdd(Block block) {
-        boolean result = dependBlockWhitelist.add(block);
+        boolean result = dependBlockWhitelist().add(block);
         if (result) {
             Item item = block.asItem();
             if (item != Items.AIR) {
-                dependBlockItemWhitelist.add(item);
+                dependBlockItemWhitelist().add(item);
             }
         }
         return result;
     }
 
     public boolean dependBlockWhitelistRemove(Block block) {
-        boolean result = dependBlockWhitelist.remove(block);
+        boolean result = dependBlockWhitelist().remove(block);
         if (result) {
             Item item = block.asItem();
             if (item != Items.AIR) {
-                dependBlockItemWhitelist.remove(item);
+                dependBlockItemWhitelist().remove(item);
             }
         }
         return result;
     }
 
     public static Config createDefaultConfig() {
-        final Config config = new Config();
-        config.blockWhitelist.addAll(getDefaultBlockWhitelist());
+        final Config config = Config.createInstance();
+        config.blockWhitelist().addAll(getDefaultBlockWhitelist());
         for (Block block : getDefaultDependBlockWhitelist()) {
             config.dependBlockWhitelistAdd(block);
         }
         return config;
     }
 
-    @SuppressWarnings("SpellCheckingInspection")
     private static void mkdirs() {
         File parent = PATH_CONFIG.getParentFile();
         if (!parent.exists() || !parent.isDirectory())
@@ -154,23 +224,86 @@ public class Config {
         //#endif
     }
 
+    public boolean isDebug() {
+        return debug().orElseThrow();
+    }
+
+    public void setDebug(boolean value) {
+        debug().set(value);
+        debug().sync();
+    }
+
+    public boolean isHeadlessPistonMode() {
+        return headlessPistonMode().orElseThrow();
+    }
+
+    public void setHeadlessPistonMode(boolean value) {
+        headlessPistonMode().set(value);
+        headlessPistonMode().sync();
+    }
+
+    public boolean isHello() {
+        return hello().orElseThrow();
+    }
+
+    public void setHello(boolean value) {
+        hello().set(value);
+        hello().sync();
+    }
+
+    public boolean isBlinkDuringTasksTick() {
+        return blinkDuringTasksTick().orElseThrow();
+    }
+
+    public void setBlinkDuringTasksTick(boolean value) {
+        blinkDuringTasksTick().set(value);
+        blinkDuringTasksTick().sync();
+    }
+
+    public int getPingSpikeThreshold() {
+        return pingSpikeThreshold().orElseThrow();
+    }
+
+    public void setPingSpikeThreshold(int value) {
+        pingSpikeThreshold().set(value);
+        pingSpikeThreshold().sync();
+    }
+
+    public PowerBlockType getPowerBlockUsage() {
+        return powerBlockUsage().orElseThrow();
+    }
+
+    public void setPowerBlockUsage(PowerBlockType value) {
+        powerBlockUsage().set(value);
+        powerBlockUsage().sync();
+    }
+
+    public DistanceCalculationMode getDistanceCalculationMode() {
+        return distanceCalculationMode().orElseThrow();
+    }
+
+    public void setDistanceCalculationMode(DistanceCalculationMode value) {
+        distanceCalculationMode().set(value);
+        distanceCalculationMode().sync();
+    }
+
     private static final class ConfigTypeAdapter extends TypeAdapter<Config> {
         @Override
         public void write(JsonWriter out, Config config) throws IOException {
             out.beginObject();
-            out.name("debug").value(config.debug);
-            out.name("headless-piston-mode").value(config.headlessPistonMode);
+            out.name("debug").value(config.isDebug());
+            out.name("headless-piston-mode").value(config.isHeadlessPistonMode());
             // 默认隐藏hello选项，这样用户无法通过正常方式影响hello包的发送
-            if (!config.hello)
-                out.name("hello").value(config.hello);
-            out.name("blink-during-tasks-tick").value(config.blinkDuringTasksTick);
-            out.name("ping-spike-threshold").value(config.pingSpikeThreshold);
-            out.name("power-block-usage").value(config.powerBlockUsage.toString());
-            out.name("distance-calculation-mode").value(config.distanceCalculationMode.toString());
+            if (!config.isHello())
+                out.name("hello").value(config.isHello());
+            out.name("blink-during-tasks-tick").value(config.isBlinkDuringTasksTick());
+            out.name("ping-spike-threshold").value(config.getPingSpikeThreshold());
+            out.name("power-block-usage").value(config.getPowerBlockUsage().toString());
+            out.name("distance-calculation-mode").value(config.getDistanceCalculationMode().toString());
             final Identifier defaultId = Registries.BLOCK.getDefaultId();
             {
                 out.name("whitelist").beginArray();
-                for (Block block : config.blockWhitelist) {
+                for (Block block : config.blockWhitelist()) {
                     Identifier id = Registries.BLOCK.getId(block);
                     if (id != defaultId) {
                         out.value(id.toString());
@@ -180,7 +313,7 @@ public class Config {
             }
             {
                 out.name("depend-block-whitelist").beginArray();
-                for (Block block : config.dependBlockWhitelist) {
+                for (Block block : config.dependBlockWhitelist()) {
                     Identifier id = Registries.BLOCK.getId(block);
                     if (id != defaultId) {
                         out.value(id.toString());
@@ -193,38 +326,38 @@ public class Config {
 
         @Override
         public Config read(JsonReader in) throws IOException {
-            final Config config = new Config();
+            final Config config = Config.createInstance();
             try {
                 in.beginObject();
                 while (in.hasNext()) {
                     String name = in.nextName();
                     switch (name) {
                         case "debug": {
-                            config.debug = in.nextBoolean();
+                            config.setDebug(in.nextBoolean());
                             break;
                         }
                         case "headless-piston-mode": {
-                            config.headlessPistonMode = in.nextBoolean();
+                            config.setHeadlessPistonMode(in.nextBoolean());
                             break;
                         }
                         case "hello": {
-                            config.hello = in.nextBoolean();
+                            config.setHello(in.nextBoolean());
                             break;
                         }
                         case "blink-during-tasks-tick": {
-                            config.blinkDuringTasksTick = in.nextBoolean();
+                            config.setBlinkDuringTasksTick(in.nextBoolean());
                             break;
                         }
                         case "ping-spike-threshold": {
-                            config.pingSpikeThreshold = in.nextInt();
+                            config.setPingSpikeThreshold(in.nextInt());
                             break;
                         }
                         case "power-block-usage": {
-                            config.powerBlockUsage = PowerBlockType.of(in.nextString());
+                            config.setPowerBlockUsage(PowerBlockType.of(in.nextString()));
                             break;
                         }
                         case "distance-calculation-mode": {
-                            config.distanceCalculationMode = DistanceCalculationMode.of(in.nextString());
+                            config.setDistanceCalculationMode(DistanceCalculationMode.of(in.nextString()));
                             break;
                         }
                         case "whitelist": {
@@ -233,7 +366,7 @@ public class Config {
                                 final String id = in.nextString();
                                 Block block = Registries.BLOCK.get(identifierOf(id));
                                 if (block != Blocks.AIR) {
-                                    if (!config.blockWhitelist.add(block)) {
+                                    if (!config.blockWhitelist().add(block)) {
                                         BlockMinerMod.LOGGER.debug("Duplicate block during config loading: {}", id);
                                     }
                                 } else {

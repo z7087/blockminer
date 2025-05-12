@@ -19,7 +19,7 @@ public class MixinClientLoginNetworkHandler {
 
     @Inject(method = "onSuccess", at = @At("RETURN"))
     private void onOnSuccess(CallbackInfo ci) {
-        if (BlockMinerMod.getInstance().config.hello) {
+        if (BlockMinerMod.getInstance().getConfig().isHello()) {
             // 1.20.2之后似乎没有不借助fabric-api用尽量小的侵入发自定义包的方法，就这样吧
             // 要是有神奇反作弊报坏包就给这删了
             //#if MC >= 12002

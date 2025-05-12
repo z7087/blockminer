@@ -2,38 +2,75 @@ package me.z7087.blockminer.util;
 
 import me.z7087.blockminer.mixin.minecraft.client.network.ClientPlayerEntityAccessor;
 import me.z7087.blockminer.util.data.Rotation;
+import me.z7087.final2constant.Constant;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.util.math.Box;
+import org.objectweb.asm.Type;
 
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.util.ArrayDeque;
 import java.util.Deque;
-import java.util.LinkedList;
 import java.util.function.Supplier;
 
-public final class RotationUtils {
-    private final Deque<Rotation> rotations = new LinkedList<>();
-    {
+public abstract class RotationUtils {
+    private RotationUtils() {}
+
+    private static final MethodHandle CONSTRUCTOR = Constant.factory.ofRecordConstructor(
+            MethodHandles.lookup(),
+            RotationUtils.class,
+            false,
+            new String[] {
+                    "rotations"
+            },
+            new String[] {
+                    Type.getDescriptor(Deque.class)
+            },
+            new String[] {
+                    "keepRotationToNextTick"
+            },
+            new String[] {
+                    Type.getDescriptor(Boolean.TYPE)
+            },
+            true,
+            false
+    );
+
+    public static RotationUtils createInstance() {
+        final Deque<Rotation> rotations = new ArrayDeque<>();
         rotations.add(Rotation.None.INSTANCE);
+        try {
+            return (RotationUtils) CONSTRUCTOR.invokeExact(
+                    rotations
+            );
+        } catch (Throwable e) {
+            throw new RuntimeException(e);
+        }
     }
-    private boolean keepRotationToNextTick = false;
+
+    abstract Deque<Rotation> rotations();
+
+    abstract boolean keepRotationToNextTick();
+    abstract void keepRotationToNextTick(boolean value);
 
     public Rotation getRotation() {
-        return rotations.getFirst();
+        return rotations().getFirst();
     }
 
     private void setRotation(Rotation rotation) {
-        rotations.removeFirst();
-        rotations.addFirst(rotation);
+        rotations().removeFirst();
+        rotations().addFirst(rotation);
     }
 
     private void pushRotation(Rotation rotation) {
-        rotations.addFirst(rotation);
+        rotations().addFirst(rotation);
     }
 
     private void popRotation() {
-        if (rotations.size() <= 1)
+        if (rotations().size() <= 1)
             throw new IllegalStateException("cannot pop rotation for size <=1 stack");
-        rotations.removeFirst();
+        rotations().removeFirst();
     }
 
     public boolean hasYaw() {
@@ -209,22 +246,21 @@ public final class RotationUtils {
     }
 
     public void markKeepRotation() {
-        keepRotationToNextTick = true;
+        keepRotationToNextTick(true);
     }
 
     public void forceClearRotations() {
-        rotations.clear();
-        rotations.add(Rotation.None.INSTANCE);
+        rotations().clear();
+        rotations().add(Rotation.None.INSTANCE);
     }
 
     public void resetRotationIfNoKeepRotation() {
-        if (rotations.size() > 1) {
+        if (rotations().size() > 1) {
             throw new IllegalStateException("called resetRotation() during calling useRotationDuring()");
         }
-        if (keepRotationToNextTick)
-            keepRotationToNextTick = false;
+        if (keepRotationToNextTick())
+            keepRotationToNextTick(false);
         else
             setRotation(Rotation.None.INSTANCE);
     }
-
 }

@@ -51,7 +51,7 @@ public class Task implements Comparable<Task> {
         if (this.waitTicks > 0) {
             throw new IllegalStateException("still waiting");
         }
-        this.waitTicks = ticks + BlockMinerMod.getInstance().config.pingSpikeThreshold;
+        this.waitTicks = ticks + BlockMinerMod.getInstance().getConfig().getPingSpikeThreshold();
     }
 
     public boolean tick() {
@@ -61,7 +61,7 @@ public class Task implements Comparable<Task> {
         if (player == null || world == null)
             return false;
         final ClientPlayerInteractionManager interactionManager = Objects.requireNonNull(client.interactionManager);
-        final RotationUtils rotationUtils = BlockMinerMod.getInstance().rotationUtils;
+        final RotationUtils rotationUtils = BlockMinerMod.getInstance().getRotationUtils();
         final PlayerInventory inventory;
         //#if MC >= 11700
         inventory = player.getInventory();
@@ -80,14 +80,14 @@ public class Task implements Comparable<Task> {
                         break loop;
                     }
                     pistonIndex = InventoryUtils.findFirstItemInHotbar(inventory, Items.PISTON);
-                    if (pistonIndex == -1 && BlockMinerMod.getInstance().config.headlessPistonMode) {
+                    if (pistonIndex == -1 && BlockMinerMod.getInstance().getConfig().isHeadlessPistonMode()) {
                         pistonIndex = InventoryUtils.findFirstItemInHotbar(inventory, Items.STICKY_PISTON);
                     }
                     if (pistonIndex == -1) {
                         break loop;
                     } else {
-                        dependBlockIndex = InventoryUtils.findFirstItemInHotbar(inventory, (stack) -> BlockMinerMod.getInstance().config.dependBlockWhitelistContains(stack.getItem()));
-                        PowerBlockType powerBlockUsage = BlockMinerMod.getInstance().config.powerBlockUsage;
+                        dependBlockIndex = InventoryUtils.findFirstItemInHotbar(inventory, (stack) -> BlockMinerMod.getInstance().getConfig().dependBlockWhitelistContains(stack.getItem()));
+                        PowerBlockType powerBlockUsage = BlockMinerMod.getInstance().getConfig().getPowerBlockUsage();
                         pickaxeIndex = InventoryUtils.findBestItemInHotbar(inventory,
                                 (stack ->
                                         InventoryUtils.isPickaxe(stack)
@@ -125,7 +125,7 @@ public class Task implements Comparable<Task> {
                                 && BlockUtils.playerCanTouchServerside(player, (dependBlockPos = pistonPowerInfo.powerBlockPos.offset(pistonPowerInfo.powerBlockFace.getOpposite())), 1, false)
                                 && world.canPlace(Blocks.STONE.getDefaultState(), pistonPowerInfo.pistonPos, ShapeContext.absent())
                                 // 当依赖方块是目标方块时，无法创建无头活塞
-                                && (!BlockMinerMod.getInstance().config.headlessPistonMode || !dependBlockPos.equals(targetPos))) {
+                                && (!BlockMinerMod.getInstance().getConfig().isHeadlessPistonMode() || !dependBlockPos.equals(targetPos))) {
                             // 朝上下的活塞的朝向可以立即到位，其他方向的不行
                             switch (pistonPowerInfo.pistonFace) {
                                 case UP:
@@ -192,7 +192,7 @@ public class Task implements Comparable<Task> {
                     BlockPos dependBlockPos = pistonPowerInfo.powerBlockPos.offset(pistonPowerInfo.powerBlockFace.getOpposite());
                     final BlockState dependBlockState = world.getBlockState(dependBlockPos);
                     if (inventory.getStack(pistonIndex).getItem() != Items.PISTON
-                            || (dependBlockIndex != -1 && !BlockMinerMod.getInstance().config.dependBlockWhitelistContains(inventory.getStack(dependBlockIndex).getItem()))
+                            || (dependBlockIndex != -1 && !BlockMinerMod.getInstance().getConfig().dependBlockWhitelistContains(inventory.getStack(dependBlockIndex).getItem()))
                             || (redstoneTorchIndex != -1 && inventory.getStack(redstoneTorchIndex).getItem() != Items.REDSTONE_TORCH)
                             || (leverIndex != -1 && inventory.getStack(leverIndex).getItem() != Items.LEVER)
                             || !BlockUtils.isReplaceable(world.getBlockState(pistonPowerInfo.pistonPos))
@@ -402,8 +402,8 @@ public class Task implements Comparable<Task> {
                             retry();
                             break loop;
                         }
-                        if (BlockUtils.playerCanTouchServerside(player, pistonPowerInfo.pistonPos, 1, true) && !BlockMinerMod.getInstance().blockBreakUtils.isModBreakingBlock()) {
-                            BlockMinerMod.getInstance().blockBreakUtils.setBreaking(true);
+                        if (BlockUtils.playerCanTouchServerside(player, pistonPowerInfo.pistonPos, 1, true) && !BlockMinerMod.getInstance().getBlockBreakUtils().isModBreakingBlock()) {
+                            BlockMinerMod.getInstance().getBlockBreakUtils().setBreaking(true);
                             isMining = true;
                             interactionManager.cancelBlockBreaking();
                             interactionManager.attackBlock(pistonPowerInfo.pistonPos, Direction.DOWN);
@@ -447,7 +447,7 @@ public class Task implements Comparable<Task> {
                         break loop;
                     }
                     BlockPos dependBlockPos = pistonPowerInfo.powerBlockPos.offset(pistonPowerInfo.powerBlockFace.getOpposite());
-                    if (redstoneTorchIndex != -1 && BlockMinerMod.getInstance().config.headlessPistonMode && !BlockUtils.playerCanTouchServerside(player, pistonPowerInfo.powerBlockPos.offset(pistonPowerInfo.powerBlockFace.getOpposite()), 1, false)) {
+                    if (redstoneTorchIndex != -1 && BlockMinerMod.getInstance().getConfig().isHeadlessPistonMode() && !BlockUtils.playerCanTouchServerside(player, pistonPowerInfo.powerBlockPos.offset(pistonPowerInfo.powerBlockFace.getOpposite()), 1, false)) {
                         rotationUtils.markKeepRotation();
                         // 如果是无头活塞模式，且此task使用红石火把，且太远碰不到红石火把依附的方块，延后
                         break loop;
@@ -501,10 +501,10 @@ public class Task implements Comparable<Task> {
                         ClientPlayerInteractionManagerAccessor interactionManagerAccessor = (ClientPlayerInteractionManagerAccessor) interactionManager;
                         while (interactionManager.isBreakingBlock() && interactionManagerAccessor.invokeIsCurrentlyBreaking(pistonPowerInfo.pistonPos))
                             interactionManager.updateBlockBreakingProgress(pistonPowerInfo.pistonPos, Direction.DOWN);
-                        BlockMinerMod.getInstance().blockBreakUtils.setBreaking(false);
+                        BlockMinerMod.getInstance().getBlockBreakUtils().setBreaking(false);
                         isMining = false;
                     }
-                    if (BlockMinerMod.getInstance().config.headlessPistonMode) {
+                    if (BlockMinerMod.getInstance().getConfig().isHeadlessPistonMode()) {
                         // 无头活塞模式下的重新放置阶段，先重新激活信号源或先放置活塞都是可以的
                         // 但先放置活塞的话目标方块可能被意外破掉，所以这里选择先重新激活信号源
                         ActionResult result;
@@ -586,7 +586,7 @@ public class Task implements Comparable<Task> {
     private void retry() {
         state = TaskState.Start;
         if (isMining) {
-            BlockMinerMod.getInstance().blockBreakUtils.setBreaking(false);
+            BlockMinerMod.getInstance().getBlockBreakUtils().setBreaking(false);
             Objects.requireNonNull(MinecraftClient.getInstance().interactionManager).cancelBlockBreaking();
             isMining = false;
         }

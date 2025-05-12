@@ -60,7 +60,7 @@ public final class BlockUtils {
                                                    BlockPos blockPos,
                                                    double additionalRange,
                                                    boolean isMine) {
-        return playerCanTouchServerside(player, blockPos, additionalRange, BlockMinerMod.getInstance().config.distanceCalculationMode, isMine);
+        return playerCanTouchServerside(player, blockPos, additionalRange, BlockMinerMod.getInstance().getConfig().getDistanceCalculationMode(), isMine);
     }
 
     public static boolean playerCanTouchServerside(PlayerEntity player,

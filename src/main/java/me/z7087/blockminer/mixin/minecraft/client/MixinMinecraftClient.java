@@ -21,14 +21,13 @@ public abstract class MixinMinecraftClient {
     @Shadow
     public ClientPlayerEntity player;
 
-    @SuppressWarnings("SpellCheckingInspection")
     @Shadow
     public HitResult crosshairTarget;
 
     @Redirect(method = "doAttack", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/network/ClientPlayerInteractionManager;attackBlock(Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/util/math/Direction;)Z"))
     private boolean beforeAttackBlock(ClientPlayerInteractionManager interactionManager, BlockPos pos, Direction direction) {
-        if (BlockMinerMod.getInstance().taskManager.handleAttackBlock(pos)
-                || BlockMinerMod.getInstance().blockBreakUtils.isModBreakingBlock())
+        if (BlockMinerMod.getInstance().getTaskManager().handleAttackBlock(pos)
+                || BlockMinerMod.getInstance().getBlockBreakUtils().isModBreakingBlock())
             return true;
         return interactionManager.attackBlock(pos, direction);
     }
@@ -41,13 +40,13 @@ public abstract class MixinMinecraftClient {
                     + "Lnet/minecraft/util/Hand;Lnet/minecraft/util/hit/BlockHitResult;)Lnet/minecraft/util/ActionResult;"
     ), order = 9800, cancellable = true)
     private void beforeUseOnBlock(CallbackInfo ci) {
-        if (this.player.getMainHandStack().isEmpty() && BlockMinerMod.getInstance().taskManager.handleUseOnBlock(((BlockHitResult) this.crosshairTarget).getBlockPos()))
+        if (this.player.getMainHandStack().isEmpty() && BlockMinerMod.getInstance().getTaskManager().handleUseOnBlock(((BlockHitResult) this.crosshairTarget).getBlockPos()))
             ci.cancel();
     }
 
     @Inject(method = "handleBlockBreaking", at = @At(value = "FIELD", target = "Lnet/minecraft/client/MinecraftClient;attackCooldown:I", opcode = Opcodes.GETFIELD), cancellable = true)
     private void beforeBlockBreaking(CallbackInfo ci) {
-        if (BlockMinerMod.getInstance().blockBreakUtils.isModBreakingBlock()) {
+        if (BlockMinerMod.getInstance().getBlockBreakUtils().isModBreakingBlock()) {
             ci.cancel();
         }
     }
