@@ -3,39 +3,57 @@ package me.z7087.blockminer.util;
 import me.z7087.blockminer.mixin.minecraft.client.network.ClientPlayerEntityAccessor;
 import me.z7087.blockminer.util.data.Rotation;
 import me.z7087.final2constant.Constant;
+import me.z7087.final2constant.util.JavaHelper;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.util.math.Box;
-import org.objectweb.asm.Type;
 
+import java.io.Serializable;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
 public abstract class RotationUtils {
     private RotationUtils() {}
 
-    private static final MethodHandle CONSTRUCTOR = Constant.factory.ofRecordConstructor(
-            MethodHandles.lookup(),
-            RotationUtils.class,
-            false,
-            new String[] {
-                    "rotations"
-            },
-            new String[] {
-                    Type.getDescriptor(Deque.class)
-            },
-            new String[] {
-                    "keepRotationToNextTick"
-            },
-            new String[] {
-                    Type.getDescriptor(Boolean.TYPE)
-            },
-            true,
-            false
-    );
+    private static final MethodHandle CONSTRUCTOR;
+    static {
+        final String[] immutableNames, immutableDescriptors, mutableNames, mutableDescriptors;
+        try {
+            RotationUtils rotationUtilsEmptyImpl = Constant.factory.ofEmptyAbstractImplInstance(
+                    MethodHandles.lookup(),
+                    RotationUtils.class
+            );
+            final String[][] immutableNamesAndDescriptors = JavaHelper.getNamesAndDescriptors(
+                    MethodHandles.lookup(),
+                    (Supplier<Deque<Rotation>> & Serializable) rotationUtilsEmptyImpl::rotations
+            );
+            final String[][] mutableNamesAndDescriptors = JavaHelper.getNamesAndDescriptors(
+                    MethodHandles.lookup(),
+                    (BooleanSupplier & Serializable) rotationUtilsEmptyImpl::keepRotationToNextTick
+            );
+            immutableNames = immutableNamesAndDescriptors[0];
+            immutableDescriptors = immutableNamesAndDescriptors[1];
+            mutableNames = mutableNamesAndDescriptors[0];
+            mutableDescriptors = mutableNamesAndDescriptors[1];
+        } catch (Throwable t) {
+            throw new RuntimeException(t);
+        }
+        CONSTRUCTOR = Constant.factory.ofRecordConstructor(
+                MethodHandles.lookup(),
+                RotationUtils.class,
+                false,
+                immutableNames,
+                immutableDescriptors,
+                mutableNames,
+                mutableDescriptors,
+                true,
+                false
+        );
+    }
 
     public static RotationUtils createInstance() {
         final Deque<Rotation> rotations = new ArrayDeque<>();

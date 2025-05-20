@@ -2,29 +2,45 @@ package me.z7087.blockminer.util;
 
 import me.z7087.final2constant.Constant;
 import me.z7087.final2constant.DynamicConstant;
-import org.objectweb.asm.Type;
+import me.z7087.final2constant.util.JavaHelper;
 
+import java.io.Serializable;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
+import java.util.function.Supplier;
 
 public abstract class BlockBreakUtils {
     private BlockBreakUtils() {}
 
-    private static final MethodHandle CONSTRUCTOR = Constant.factory.ofRecordConstructor(
-            MethodHandles.lookup(),
-            BlockBreakUtils.class,
-            false,
-            new String[] {
-                    "breaking"
-            },
-            new String[] {
-                    Type.getDescriptor(DynamicConstant.class)
-            },
-            null,
-            null,
-            true,
-            false
-    );
+    private static final MethodHandle CONSTRUCTOR;
+    static {
+        final String[] immutableNames, immutableDescriptors;
+        try {
+            BlockBreakUtils blockBreakUtilsEmptyImpl = Constant.factory.ofEmptyAbstractImplInstance(
+                    MethodHandles.lookup(),
+                    BlockBreakUtils.class
+            );
+            final String[][] immutableNamesAndDescriptors = JavaHelper.getNamesAndDescriptors(
+                    MethodHandles.lookup(),
+                    (Supplier<DynamicConstant<Boolean>> & Serializable) blockBreakUtilsEmptyImpl::breaking
+            );
+            immutableNames = immutableNamesAndDescriptors[0];
+            immutableDescriptors = immutableNamesAndDescriptors[1];
+        } catch (Throwable t) {
+            throw new RuntimeException(t);
+        }
+        CONSTRUCTOR = Constant.factory.ofRecordConstructor(
+                MethodHandles.lookup(),
+                BlockBreakUtils.class,
+                false,
+                immutableNames,
+                immutableDescriptors,
+                null,
+                null,
+                true,
+                false
+        );
+    }
 
     public static BlockBreakUtils createInstance() {
         try {

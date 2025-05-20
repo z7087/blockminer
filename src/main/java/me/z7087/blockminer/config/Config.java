@@ -9,6 +9,7 @@ import me.z7087.blockminer.util.enums.DistanceCalculationMode;
 import me.z7087.blockminer.util.enums.PowerBlockType;
 import me.z7087.final2constant.Constant;
 import me.z7087.final2constant.DynamicConstant;
+import me.z7087.final2constant.util.JavaHelper;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
@@ -16,13 +17,13 @@ import net.minecraft.item.Item;
 import net.minecraft.item.Items;
 import net.minecraft.registry.Registries;
 import net.minecraft.util.Identifier;
-import org.objectweb.asm.Type;
 
 import java.io.*;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.function.Supplier;
 
 public abstract class Config {
     public static final File PATH_CONFIG = new File(FabricLoader.getInstance().getConfigDir().toFile(), BlockMinerMod.MOD_ID + ".json");
@@ -35,39 +36,44 @@ public abstract class Config {
     }
     private Config() {}
 
-    private static final MethodHandle CONSTRUCTOR = Constant.factory.ofRecordConstructor(
-            MethodHandles.lookup(),
-            Config.class,
-            false,
-            new String[] {
-                    "debug",
-                    "headlessPistonMode",
-                    "hello",
-                    "blinkDuringTasksTick",
-                    "pingSpikeThreshold",
-                    "powerBlockUsage",
-                    "distanceCalculationMode",
-                    "blockWhitelist",
-                    "dependBlockWhitelist",
-                    "dependBlockItemWhitelist"
-            },
-            new String[] {
-                    Type.getDescriptor(DynamicConstant.class),
-                    Type.getDescriptor(DynamicConstant.class),
-                    Type.getDescriptor(DynamicConstant.class),
-                    Type.getDescriptor(DynamicConstant.class),
-                    Type.getDescriptor(DynamicConstant.class),
-                    Type.getDescriptor(DynamicConstant.class),
-                    Type.getDescriptor(DynamicConstant.class),
-                    Type.getDescriptor(Set.class),
-                    Type.getDescriptor(Set.class),
-                    Type.getDescriptor(Set.class)
-            },
-            null,
-            null,
-            true,
-            false
-    );
+    private static final MethodHandle CONSTRUCTOR;
+    static {
+        final String[] immutableNames, immutableDescriptors;
+        try {
+            Config configEmptyImpl = Constant.factory.ofEmptyAbstractImplInstance(
+                    MethodHandles.lookup(),
+                    Config.class
+            );
+            final String[][] immutableNamesAndDescriptors = JavaHelper.getNamesAndDescriptors(
+                    MethodHandles.lookup(),
+                    (Supplier<DynamicConstant<Boolean>> & Serializable) configEmptyImpl::debug,
+                    (Supplier<DynamicConstant<Boolean>> & Serializable) configEmptyImpl::headlessPistonMode,
+                    (Supplier<DynamicConstant<Boolean>> & Serializable) configEmptyImpl::hello,
+                    (Supplier<DynamicConstant<Boolean>> & Serializable) configEmptyImpl::blinkDuringTasksTick,
+                    (Supplier<DynamicConstant<Integer>> & Serializable) configEmptyImpl::pingSpikeThreshold,
+                    (Supplier<DynamicConstant<PowerBlockType>> & Serializable) configEmptyImpl::powerBlockUsage,
+                    (Supplier<DynamicConstant<DistanceCalculationMode>> & Serializable) configEmptyImpl::distanceCalculationMode,
+                    (Supplier<Set<Block>> & Serializable) configEmptyImpl::blockWhitelist,
+                    (Supplier<Set<Block>> & Serializable) configEmptyImpl::dependBlockWhitelist,
+                    (Supplier<Set<Item>> & Serializable) configEmptyImpl::dependBlockItemWhitelist
+            );
+            immutableNames = immutableNamesAndDescriptors[0];
+            immutableDescriptors = immutableNamesAndDescriptors[1];
+        } catch (Throwable t) {
+            throw new RuntimeException(t);
+        }
+        CONSTRUCTOR = Constant.factory.ofRecordConstructor(
+                MethodHandles.lookup(),
+                Config.class,
+                false,
+                immutableNames,
+                immutableDescriptors,
+                null,
+                null,
+                true,
+                false
+        );
+    }
 
     public static Config createInstance() {
         final DynamicConstant<Boolean> debug = Constant.factory.ofMutable(false);
@@ -193,7 +199,7 @@ public abstract class Config {
         //noinspection TryFinallyCanBeTryWithResources
         try {
             writer = new FileWriter(PATH_CONFIG);
-            GSON.toJson(config, writer);
+            GSON.toJson(config, Config.class, writer);
         } finally {
             if (writer != null) {
                 try {

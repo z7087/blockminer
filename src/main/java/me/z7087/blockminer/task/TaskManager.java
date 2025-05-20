@@ -7,18 +7,20 @@ import me.z7087.blockminer.util.MessageUtils;
 import me.z7087.blockminer.util.enums.TaskState;
 import me.z7087.final2constant.Constant;
 import me.z7087.final2constant.DynamicConstant;
+import me.z7087.final2constant.util.JavaHelper;
 import net.minecraft.block.Block;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.network.ClientConnection;
 import net.minecraft.util.math.BlockPos;
-import org.objectweb.asm.Type;
 
+import java.io.Serializable;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.ref.WeakReference;
 import java.util.*;
+import java.util.function.Supplier;
 
 // 单方块方案：
 // 先拿到所有可能的活塞能源方块放置方法
@@ -33,27 +35,38 @@ import java.util.*;
 public abstract class TaskManager {
     protected TaskManager() {}
 
-    private static final MethodHandle CONSTRUCTOR = Constant.factory.ofRecordConstructor(
-            MethodHandles.lookup(),
-            TaskManager.class,
-            false,
-            new String[] {
-                    "enabled",
-                    "prevWorldRef",
-                    "posSet",
-                    "taskQueue"
-            },
-            new String[] {
-                    Type.getDescriptor(DynamicConstant.class),
-                    Type.getDescriptor(DynamicConstant.class),
-                    Type.getDescriptor(Set.class),
-                    Type.getDescriptor(LinkedList.class)
-            },
-            null,
-            null,
-            true,
-            false
-    );
+    private static final MethodHandle CONSTRUCTOR;
+    static {
+        final String[] immutableNames, immutableDescriptors;
+        try {
+            TaskManager taskManagerEmptyImpl = Constant.factory.ofEmptyAbstractImplInstance(
+                    MethodHandles.lookup(),
+                    TaskManager.class
+            );
+            final String[][] immutableNamesAndDescriptors = JavaHelper.getNamesAndDescriptors(
+                    MethodHandles.lookup(),
+                    (Supplier<DynamicConstant<Boolean>> & Serializable) taskManagerEmptyImpl::enabled,
+                    (Supplier<DynamicConstant<WeakReference<ClientWorld>>> & Serializable) taskManagerEmptyImpl::prevWorldRef,
+                    (Supplier<Set<BlockPos>> & Serializable) taskManagerEmptyImpl::posSet,
+                    (Supplier<LinkedList<Task>> & Serializable) taskManagerEmptyImpl::taskQueue
+            );
+            immutableNames = immutableNamesAndDescriptors[0];
+            immutableDescriptors = immutableNamesAndDescriptors[1];
+        } catch (Throwable t) {
+            throw new RuntimeException(t);
+        }
+        CONSTRUCTOR = Constant.factory.ofRecordConstructor(
+                MethodHandles.lookup(),
+                TaskManager.class,
+                false,
+                immutableNames,
+                immutableDescriptors,
+                null,
+                null,
+                true,
+                false
+        );
+    }
 
     public static TaskManager createInstance() {
         final DynamicConstant<Boolean> enabled = Constant.factory.ofMutable(Boolean.FALSE);

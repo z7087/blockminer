@@ -7,13 +7,15 @@ import me.z7087.blockminer.util.BlockBreakUtils;
 import me.z7087.blockminer.util.RotationUtils;
 import me.z7087.final2constant.Constant;
 import me.z7087.final2constant.DynamicConstant;
+import me.z7087.final2constant.util.JavaHelper;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
-import org.objectweb.asm.Type;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
+import java.util.function.Supplier;
 
 public final class BlockMinerMod implements ClientModInitializer {
     public interface ModConstants {
@@ -42,21 +44,33 @@ public final class BlockMinerMod implements ClientModInitializer {
     }
     private static final DynamicConstant<BlockMinerMod> INSTANCE = Constant.factory.ofMutable(null);
     private static final DynamicConstant<ModConstants> MOD_CONSTANTS = Constant.factory.ofMutable(null);
-    private static final MethodHandle MOD_CONSTANTS_CONSTRUCTOR = Constant.factory.ofRecordConstructor(
-            MethodHandles.lookup(),
-            ModConstants.class,
-            new String[] {
-                    "config",
-                    "taskManager",
-                    "blockBreakUtils",
-                    "rotationUtils"
-            },
-            new String[] {
-                    Type.getDescriptor(DynamicConstant.class),
-                    Type.getDescriptor(TaskManager.class),
-                    Type.getDescriptor(BlockBreakUtils.class),
-                    Type.getDescriptor(RotationUtils.class)
-            });
+    private static final MethodHandle MOD_CONSTANTS_CONSTRUCTOR;
+    static {
+        final String[] immutableNames, immutableDescriptors;
+        try {
+            ModConstants modConstantsEmptyImpl = Constant.factory.ofEmptyInterfaceImplInstance(
+                    MethodHandles.lookup(),
+                    ModConstants.class
+            );
+            final String[][] immutableNamesAndDescriptors = JavaHelper.getNamesAndDescriptors(
+                    MethodHandles.lookup(),
+                    (Supplier<DynamicConstant<Config>> & Serializable) modConstantsEmptyImpl::config,
+                    (Supplier<TaskManager> & Serializable) modConstantsEmptyImpl::taskManager,
+                    (Supplier<BlockBreakUtils> & Serializable) modConstantsEmptyImpl::blockBreakUtils,
+                    (Supplier<RotationUtils> & Serializable) modConstantsEmptyImpl::rotationUtils
+            );
+            immutableNames = immutableNamesAndDescriptors[0];
+            immutableDescriptors = immutableNamesAndDescriptors[1];
+        } catch (Throwable t) {
+            throw new RuntimeException(t);
+        }
+        MOD_CONSTANTS_CONSTRUCTOR = Constant.factory.ofRecordConstructor(
+                MethodHandles.lookup(),
+                ModConstants.class,
+                immutableNames,
+                immutableDescriptors
+        );
+    }
 
     public BlockMinerMod() {
         if (getInstanceOrNull() != null)
