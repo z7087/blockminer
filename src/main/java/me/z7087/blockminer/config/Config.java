@@ -48,7 +48,6 @@ public abstract class Config {
                     MethodHandles.lookup(),
                     (Supplier<DynamicConstant<Boolean>> & Serializable) configEmptyImpl::debug,
                     (Supplier<DynamicConstant<Boolean>> & Serializable) configEmptyImpl::headlessPistonMode,
-                    (Supplier<DynamicConstant<Boolean>> & Serializable) configEmptyImpl::hello,
                     (Supplier<DynamicConstant<Boolean>> & Serializable) configEmptyImpl::blinkDuringTasksTick,
                     (Supplier<DynamicConstant<Integer>> & Serializable) configEmptyImpl::pingSpikeThreshold,
                     (Supplier<DynamicConstant<PowerBlockType>> & Serializable) configEmptyImpl::powerBlockUsage,
@@ -78,7 +77,6 @@ public abstract class Config {
     public static Config createInstance() {
         final DynamicConstant<Boolean> debug = Constant.factory.ofMutable(false);
         final DynamicConstant<Boolean> headlessPistonMode = Constant.factory.ofMutable(false);
-        final DynamicConstant<Boolean> hello = Constant.factory.ofMutable(true);
         final DynamicConstant<Boolean> blinkDuringTasksTick = Constant.factory.ofMutable(false);
         final DynamicConstant<Integer> pingSpikeThreshold = Constant.factory.ofMutable(0);
         final DynamicConstant<PowerBlockType> powerBlockUsage = Constant.factory.ofMutable(PowerBlockType.Both);
@@ -91,7 +89,6 @@ public abstract class Config {
             return (Config) CONSTRUCTOR.invokeExact(
                     debug,
                     headlessPistonMode,
-                    hello,
                     blinkDuringTasksTick,
                     pingSpikeThreshold,
                     powerBlockUsage,
@@ -107,7 +104,6 @@ public abstract class Config {
 
     abstract DynamicConstant<Boolean> debug();
     abstract DynamicConstant<Boolean> headlessPistonMode();
-    abstract DynamicConstant<Boolean> hello();
     abstract DynamicConstant<Boolean> blinkDuringTasksTick();
     abstract DynamicConstant<Integer> pingSpikeThreshold();
     abstract DynamicConstant<PowerBlockType> powerBlockUsage();
@@ -248,15 +244,6 @@ public abstract class Config {
         headlessPistonMode().sync();
     }
 
-    public boolean isHello() {
-        return hello().orElseThrow();
-    }
-
-    public void setHello(boolean value) {
-        hello().set(value);
-        hello().sync();
-    }
-
     public boolean isBlinkDuringTasksTick() {
         return blinkDuringTasksTick().orElseThrow();
     }
@@ -299,9 +286,6 @@ public abstract class Config {
             out.beginObject();
             out.name("debug").value(config.isDebug());
             out.name("headless-piston-mode").value(config.isHeadlessPistonMode());
-            // 默认隐藏hello选项，这样用户无法通过正常方式影响hello包的发送
-            if (!config.isHello())
-                out.name("hello").value(config.isHello());
             out.name("blink-during-tasks-tick").value(config.isBlinkDuringTasksTick());
             out.name("ping-spike-threshold").value(config.getPingSpikeThreshold());
             out.name("power-block-usage").value(config.getPowerBlockUsage().toString());
@@ -344,10 +328,6 @@ public abstract class Config {
                         }
                         case "headless-piston-mode": {
                             config.setHeadlessPistonMode(in.nextBoolean());
-                            break;
-                        }
-                        case "hello": {
-                            config.setHello(in.nextBoolean());
                             break;
                         }
                         case "blink-during-tasks-tick": {
