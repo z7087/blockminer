@@ -32,7 +32,7 @@ jobs:
       # Configure Gradle for optimal use in GitHub Actions, including caching of downloaded dependencies.
       # See: https://github.com/gradle/actions/blob/main/setup-gradle/README.md
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@af1da67850ed9a4cedd57bfd976089dd991e2582 # v4.0.0
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Set executable permission for gradlew
         run: chmod +x ./gradlew
@@ -45,3 +45,13 @@ jobs:
         with:
           name: BlockMiner-all
           path: build/libs/*.jar
+
+      - name: Create prerelease
+        uses: marvinpinto/action-automatic-releases@latest
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          automatic_release_tag: "prerelease"
+          prerelease: true
+          title: "Prerelease Build"
+          files: |
+            ./build/libs/*.jar
