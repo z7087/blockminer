@@ -5,11 +5,11 @@ import me.z7087.blockminer.mixin.minecraft.client.network.ClientPlayerInteractio
 import me.z7087.blockminer.util.BlockUtils;
 import me.z7087.blockminer.util.InventoryUtils;
 import me.z7087.blockminer.util.RotationUtils;
-import me.z7087.blockminer.util.data.Pair;
 import me.z7087.blockminer.util.data.PistonPowerInfo;
 import me.z7087.blockminer.util.enums.PowerBlockType;
 import me.z7087.blockminer.util.enums.TaskState;
 import me.z7087.blockminer.util.finder.BlockFinder;
+import me.z7087.blockminer.util.finder.BlockFinder2;
 import net.minecraft.block.*;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
@@ -111,13 +111,11 @@ public class Task implements Comparable<Task> {
                     PowerBlockType powerBlockUsage = PowerBlockType.of(redstoneTorchIndex != -1, leverIndex != -1);
                     if (powerBlockUsage == null)
                         break loop;
-                    ArrayList<Pair<BlockPos, Direction>> pistonList = new ArrayList<>();
-                    BlockFinder.findStablePistons(world, targetPos, pistonList);
-                    ArrayList<PistonPowerInfo> pistonPowerInfos = new ArrayList<>();
-                    BlockFinder.findPowerBlockForPiston(world, targetPos, powerBlockUsage, pistonList, pistonPowerInfos, dependBlockIndex != -1);
-                    if (pistonPowerInfos.isEmpty())
-                        break loop;
-                    for (PistonPowerInfo pistonPowerInfo : pistonPowerInfos) {
+                    //ArrayList<Pair<BlockPos, Direction>> pistonList = new ArrayList<>();
+                    //BlockFinder.findStablePistons(world, targetPos, pistonList);
+                    //ArrayList<PistonPowerInfo> pistonPowerInfos = new ArrayList<>();
+                    //BlockFinder.findPowerBlockForPiston(world, targetPos, powerBlockUsage, pistonList, pistonPowerInfos, dependBlockIndex != -1);
+                    for (PistonPowerInfo pistonPowerInfo : BlockFinder2.StructureFilterCache.findPossibleStructuresInCacheTMP(world, targetPos, powerBlockUsage, dependBlockIndex != -1)) {
                         this.pistonPowerInfo = pistonPowerInfo;
                         final BlockPos dependBlockPos;
                         if (BlockUtils.playerCanTouchServerside(player, pistonPowerInfo.pistonPos, 1, false)

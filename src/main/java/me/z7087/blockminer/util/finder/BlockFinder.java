@@ -285,7 +285,7 @@ public final class BlockFinder {
                         }
                     }
                     // 如果拉杆能不依赖所附着的方块激活其他活塞，不能放置
-                    for (Direction direction1 : DIRECTIONS_WITHOUT[dependDirection.ordinal()]) {
+                    for (Direction direction1 : DIRECTIONS) {
                         BlockPos pos = powerBlockPos.offset(direction1);
                         if (world.getBlockState(pos).getBlock() instanceof PistonBlock
                                 || world.getBlockState(pos.down()).getBlock() instanceof PistonBlock
