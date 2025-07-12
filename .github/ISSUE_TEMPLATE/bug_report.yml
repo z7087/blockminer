@@ -1,0 +1,82 @@
+name: 错误报告 | Bug Report
+description: 报告模组异常行为或崩溃问题 | Report abnormal behavior or crashes
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **提交前请确认 | Before reporting:**
+        ✅ 已搜索现有议题（包括已关闭的）  
+        ✅ 使用最新版模组和Fabric API  
+        ❌ 问题未被标记为`wontfix`  
+        ---
+        ✅ Searched existing issues (including closed ones)  
+        ✅ Using latest mod and Fabric API  
+        ❌ Issue not marked as `wontfix`
+
+  - type: textarea
+    attributes:
+      label: 问题描述 | Description
+      placeholder: |
+        例：在水边放置X方块时游戏崩溃
+        ---
+        Example: Game crashes when placing block X near water
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: 重现步骤 | Reproduction Steps
+      description: 触发问题的具体步骤 | Exact steps to trigger the bug
+      placeholder: |
+        1. 使用特定种子创建世界...
+        2. 使用材料合成Y物品...
+        3. 对Z实体右键点击...
+        ---
+        1. Launch world with specific seed...
+        2. Craft item Y using materials...
+        3. Right-click on entity Z...
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: 预期与实际行为 | Expected vs Actual
+      placeholder: |
+        预期：正常打开GUI界面
+        实际：抛出NullPointerException导致崩溃
+        ---
+        Expected: Should open GUI normally
+        Actual: Game crashes with NullPointerException
+
+  - type: input
+    attributes:
+      label: MC版本 | Minecraft Version
+      placeholder: "e.g. 1.16.5"
+    validations:
+      required: true
+
+  - type: input
+    attributes:
+      label: 模组版本 | Mod Version
+      description: |
+        如果是预发布版，提供对应的git commit
+        ---
+        Provide the git commit if it is a prerelease.
+      placeholder: "e.g. \"1.0.0\" \"8b4227\" "
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: 日志文件 | Logs
+      placeholder: |
+        在此粘贴日志文件或日志链接
+        ---
+        Paste log files or log links here
+      render: text
+
+  - type: textarea
+    attributes:
+      label: 已安装模组 | Installed Mods

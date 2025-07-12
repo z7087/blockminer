@@ -1,0 +1,18 @@
+name: ✨ Feature Request / 功能请求
+description: Suggest new features or improvements / 提议新功能或改进
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Please check first / 请先确认:**
+        - This feature isn't requested in existing issues / 该功能未被其他议题提议
+
+  - type: textarea
+    attributes:
+      label: Feature Description / 功能描述
+      description: What do you want to achieve? / 你希望实现什么功能？
+      placeholder: "Ex: Add configurable item cooldowns / 例：添加可配置的物品冷却时间"
+    validations:
+      required: true
