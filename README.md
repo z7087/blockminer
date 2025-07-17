@@ -27,20 +27,20 @@ BlockMiner 支持使用红石火把或拉杆这两种方案破坏方块。
 
 ## 命令列表
 
-命令 | 描述
----- | ----
-/blockminer toggle | 切换BlockMiner的状态为开启/关闭
-/blockminer config \<reload/save/reset> | 重新加载/保存/重置当前的设置
-/blockminer target-block whitelist | 显示目标方块白名单（即当前所有可指定为目标方块的方块名）
-/blockminer target-block whitelist \<add/remove> \[block_name] | 添加/移除指定方块名到目标方块白名单
-/blockminer depend-block whitelist | 显示依赖方块白名单（即当前所有可作为手动放置的依赖方块的方块名）
-/blockminer depend-block whitelist \<add/remove> \[block_name] | 添加/移除指定方块名到依赖方块白名单
-/blockminer area \<x> \<y> \<z> \<x2> \<y2> \<z2> | 将坐标从(x, y, z)到(x2, y2, z2)中的所有可指定为破坏目标的方块指定为破坏目标，仅在设置中debug开启时可用
-/blockminer blink-during-tasks-tick \[true/false] | 显示或配置blink-during-tasks-tick的值（此模式下会在处理任务时暂存发送的数据包并在当前tick处理完毕后重新发送这些数据包）
-/blockminer debug \[true/false] | 显示或配置debug的值
-/blockminer distance-calculation-mode \[old/1.19/1.20.6] | 显示或配置distance-calculation-mode的值（即距离计算模式，不同的MC服务器版本允许不同距离的最大手长，尝试调整此值以适配不同的服务器版本）
-/blockminer headless-piston-mode \[true/false] | 显示或配置headless-piston-mode的值（即无头活塞模式，此模式下会改为建造一个指向目标方块的无头活塞）
-/blockminer ping-spike-threshold \[0-1200] | 显示或配置ping-spike-threshold的值（即延迟尖峰阈值，如果它的值大于0，BlockMiner会在部分操作做完后等待\<ping-spike-threshold的值>个游戏刻，以保证服务器正确处理了这些操作）
+| 命令                                                             | 描述                                                                                                               |
+|----------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------|
+| /blockminer toggle                                             | 切换BlockMiner的状态为开启/关闭                                                                                            |
+| /blockminer config \<reload/save/reset>                        | 重新加载/保存/重置当前的设置                                                                                                  |
+| /blockminer target-block whitelist                             | 显示目标方块白名单（即当前所有可指定为目标方块的方块名）                                                                                     |
+| /blockminer target-block whitelist \<add/remove> \[block_name] | 添加/移除指定方块名到目标方块白名单                                                                                               |
+| /blockminer depend-block whitelist                             | 显示依赖方块白名单（即当前所有可作为手动放置的依赖方块的方块名）                                                                                 |
+| /blockminer depend-block whitelist \<add/remove> \[block_name] | 添加/移除指定方块名到依赖方块白名单                                                                                               |
+| /blockminer area \<x> \<y> \<z> \<x2> \<y2> \<z2>              | 将坐标从(x, y, z)到(x2, y2, z2)中的所有可指定为破坏目标的方块指定为破坏目标，仅在设置中debug开启时可用                                                 |
+| /blockminer blink-during-tasks-tick \[true/false]              | 显示或配置blink-during-tasks-tick的值（此模式下会在处理任务时暂存发送的数据包并在当前tick处理完毕后重新发送这些数据包）                                        |
+| /blockminer debug \[true/false]                                | 显示或配置debug的值                                                                                                     |
+| /blockminer distance-calculation-mode \[old/1.19/1.20.6]       | 显示或配置distance-calculation-mode的值（即距离计算模式，不同的MC服务器版本允许不同距离的最大手长，尝试调整此值以适配不同的服务器版本）                                |
+| /blockminer headless-piston-mode \[true/false]                 | 显示或配置headless-piston-mode的值（即无头活塞模式，此模式下会改为建造一个指向目标方块的无头活塞）                                                      |
+| /blockminer ping-spike-threshold \[0-1200]                     | 显示或配置ping-spike-threshold的值（即延迟尖峰阈值，如果它的值大于0，BlockMiner会在部分操作做完后等待\<ping-spike-threshold的值>个游戏刻，以保证服务器正确处理了这些操作） |
 
 ## 交流群
 
