@@ -776,7 +776,7 @@ public final class BlockFinder2 {
 
     public enum ComparablePredicate implements CPFunc {
         CP_OUT_OF_WORLD((world, pos, state) -> !world.isInBuildLimit(pos)),
-        CP_PLACEABLE((world, pos, state) -> BlockUtils.isReplaceable(state) && world.canPlace(Blocks.STONE.getDefaultState(), pos, ShapeContext.absent())),
+        CP_PLACEABLE((world, pos, state) -> BlockUtils.isReplaceable(state)/* && world.canPlace(Blocks.STONE.getDefaultState(), pos, ShapeContext.absent())*/),
         CP_SOLID_BLOCK((world, pos, state) -> state.isSolidBlock(world, pos)),
         CP_OTHER((world, pos, state) -> true);
 
