@@ -1,5 +1,5 @@
 {
-  "blockminer.toggle.on": "§2Block Miner 启动成功！",
-  "blockminer.toggle.off": "§7Block Miner 关闭成功。",
-  "blockminer.warn.multiplayer": "§7看起来你好像是在服务器使用 Block Miner ？§r\n§7Block Miner 大量使用原版 Minecraft 客户端不可能做到的操作完成破坏方块，因此可能在绝大多数服务器内被视为外挂。§r\n§7请遵守服务器规则游玩，使用 Block Miner 前先询问服务器管理员和其他玩家的意见。对于因使用 Block Miner 造成财产损失和人员伤亡的，制作者不承担任何责任。§r"
+  "blockminer.toggle.on": "§2BlockMiner 启动成功！",
+  "blockminer.toggle.off": "§7BlockMiner 关闭成功。",
+  "blockminer.warn.multiplayer": "§7看起来你好像是在服务器使用 BlockMiner ？§r\n§7BlockMiner 大量使用原版 Minecraft 客户端不可能做到的操作完成破坏方块，因此可能在绝大多数服务器内被视为外挂。§r\n§7请遵守服务器规则游玩，使用 BlockMiner 前先询问服务器管理员和其他玩家的意见。因使用 BlockMiner 造成的任何后果由使用者自负。§r"
 }
