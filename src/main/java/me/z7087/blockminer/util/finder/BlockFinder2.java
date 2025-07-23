@@ -12,6 +12,7 @@ import net.minecraft.world.World;
 
 import java.util.*;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 public final class BlockFinder2 {
@@ -322,6 +323,8 @@ public final class BlockFinder2 {
 
         private final transient BlockBoxHelper structureRange;
 
+        private final transient int hash;
+
         BlockBreakStructure(
                 Direction pistonOffset,
                 Direction pistonFace,
@@ -353,6 +356,7 @@ public final class BlockFinder2 {
                             dependBlockOffset
                     )
             );
+            this.hash = this.calcHash();
         }
 
         BlockBreakStructure(
@@ -636,14 +640,18 @@ public final class BlockFinder2 {
                     '}';
         }
 
-        @Override
-        public int hashCode() {
+        private int calcHash() {
             int result = pistonOffset.hashCode();
             result = 31 * result + pistonFace.hashCode();
             result = 31 * result + powerBlockOffset.hashCode();
             result = 31 * result + powerBlockFace.hashCode();
             result = 31 * result + powerBlockType.hashCode();
             return result;
+        }
+
+        @Override
+        public int hashCode() {
+            return hash;
         }
 
         // 允许HashMap在哈希冲突时做二叉树 但我觉得可能性没那么多
@@ -841,6 +849,25 @@ public final class BlockFinder2 {
             //System.out.println("end init StructureFilterCache with " + time / 1000000.D + " milliseconds");
         }
 
+        private static final LinkedHashSet<BlockBreakStructure> EMPTY_SET = new LinkedHashSet<>();
+        private static final Iterator<PistonPowerInfo> EMPTY_ITERATOR = new Iterator<PistonPowerInfo>() {
+            @Override
+            public boolean hasNext() {
+                return false;
+            }
+
+            @Override
+            public PistonPowerInfo next() {
+                throw new NoSuchElementException();
+            }
+
+            @Override
+            public void forEachRemaining(Consumer<? super PistonPowerInfo> action) {
+                Objects.requireNonNull(action);
+            }
+        };
+        private static final Iterable<PistonPowerInfo> EMPTY_ITERABLE = () -> EMPTY_ITERATOR;
+
         // 需要使用testBeforePlace二次测试
         public static LinkedHashSet<BlockBreakStructure> findPossibleStructuresInCache(World world, BlockPos targetPos) {
             final LinkedHashSet<BlockBreakStructure> possibleStructures = new LinkedHashSet<>(AllStructures);
@@ -856,6 +883,9 @@ public final class BlockFinder2 {
                 } else {
                     possibleStructures.retainAll(M_OTHER.get(offsetPos));
                 }
+                if (possibleStructures.isEmpty()) {
+                    return EMPTY_SET;
+                }
             }
             return possibleStructures;
         }
@@ -868,7 +898,14 @@ public final class BlockFinder2 {
                 PowerBlockType powerBlockUsage,
                 boolean hasDependBlock
         ) {
-            Stream<BlockBreakStructure> stream = findPossibleStructuresInCache(world, targetPos).stream();
+            Stream<BlockBreakStructure> stream;
+            {
+                final LinkedHashSet<BlockBreakStructure> possibleStructures = findPossibleStructuresInCache(world, targetPos);
+                if (possibleStructures.isEmpty()) {
+                    return EMPTY_ITERABLE;
+                }
+                stream = possibleStructures.stream();
+            }
             if (powerBlockUsage != PowerBlockType.Both) {
                 stream = stream.filter(structure -> structure.powerBlockType == powerBlockUsage);
             }
