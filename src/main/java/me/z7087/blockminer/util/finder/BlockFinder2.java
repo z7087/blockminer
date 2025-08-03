@@ -11,6 +11,7 @@ import net.minecraft.util.math.Vec3i;
 import net.minecraft.world.World;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
@@ -805,41 +806,212 @@ public final class BlockFinder2 {
     }
      */
 
+
+    // 对在一个集合内唯一的对象的包装。
+    // 对于哈希表中的键/集合中的元素，可以用于优化hashCode/equals计算速度、减少哈希冲突，也能在哈希表/集合过大时允许哈希表/集合对未实现Comparable的对象做红黑树。
+    // 由于id连续递增，应该也可以将id和对象对应上后存储在BitSet里。
+    // 取原始元素需要额外的时间。
+    public static final class UniqueObjectPool<T> {
+        private final AtomicLong counter = new AtomicLong();
+        private final String name;
+        private final long limit;
+
+        public UniqueObjectPool() {
+            this.name = null;
+            this.limit = -1;
+        }
+
+        public UniqueObjectPool(String name) {
+            this.name = Objects.requireNonNull(name);
+            this.limit = -1;
+        }
+
+        public UniqueObjectPool(long limit) {
+            this.name = null;
+            this.limit = limit;
+        }
+
+        public UniqueObjectPool(String name, long limit) {
+            this.name = Objects.requireNonNull(name);
+            this.limit = limit;
+        }
+
+        private static final long SIGNED_INT32_MAX_VALUE = ((long) Integer.MAX_VALUE) & 0xFFFFFFFFL;
+        private static final long UNSIGNED_INT32_MAX_VALUE = ((((long) Integer.MAX_VALUE) & 0xFFFFFFFFL) | (((long) Integer.MIN_VALUE) & 0xFFFFFFFFL));
+
+        public static <F> UniqueObjectPool<F> withSInt32Limit() {
+            return new UniqueObjectPool<>(SIGNED_INT32_MAX_VALUE);
+        }
+
+        public static <F> UniqueObjectPool<F> withSInt32Limit(String name) {
+            return new UniqueObjectPool<>(name, SIGNED_INT32_MAX_VALUE);
+        }
+
+        public static <F> UniqueObjectPool<F> withUInt32Limit() {
+            return new UniqueObjectPool<>(UNSIGNED_INT32_MAX_VALUE);
+        }
+
+        public static <F> UniqueObjectPool<F> withUInt32Limit(String name) {
+            return new UniqueObjectPool<>(name, UNSIGNED_INT32_MAX_VALUE);
+        }
+
+        public UniqueObject<T> ofUnique(T o) {
+            long id;
+            do {
+                id = counter.get();
+                if (id == limit) {
+                    throw new IllegalStateException(name != null ? "Too many unique objects in pool '" + name + "' !" : "Too many unique objects in one pool!");
+                }
+            } while (!counter.compareAndSet(id, id + 1));
+            return new UniqueObject<>(id, o);
+        }
+
+        public long nextId() {
+            return counter.get();
+        }
+
+        @Override
+        public String toString() {
+            return "UniqueObjectPool(" + (name != null ? ('"' + name + "\", ") : "") + counter.get() + ')';
+        }
+
+        public static <T> UniqueObject<T>[] createUniqueObjectArray(UniqueObjectPool<T> pool, T[] originalObjects) {
+            return createUniqueObjectArray(pool, originalObjects, 0);
+        }
+        public static <T> UniqueObject<T>[] createUniqueObjectArray(UniqueObjectPool<T> pool, Collection<T> originalObjects) {
+            return createUniqueObjectArray(pool, originalObjects, 0);
+        }
+        public static <T> UniqueObject<T>[] createUniqueObjectArray(UniqueObjectPool<T> pool, T[] originalObjects, int poolStartIndex) {
+            final int size = originalObjects.length;
+            @SuppressWarnings("unchecked")
+            final UniqueObject<T>[] uniqueObjectArray = (UniqueObject<T>[]) new UniqueObject[size];
+            for (int i = 0; i < size; ++i, ++poolStartIndex) {
+                long gotId;
+                if (pool.nextId() == poolStartIndex) {
+                    final UniqueObject<T> uniqueObject = pool.ofUnique(originalObjects[i]);
+                    if (uniqueObject.id() == poolStartIndex) {
+                        uniqueObjectArray[i] = uniqueObject;
+                        continue;
+                    } else {
+                        gotId = uniqueObject.id();
+                    }
+                } else {
+                    gotId = pool.nextId();
+                }
+                throw new IllegalStateException("Expected index " + poolStartIndex + ", but got " + gotId + "!");
+            }
+            return uniqueObjectArray;
+        }
+        public static <T> UniqueObject<T>[] createUniqueObjectArray(UniqueObjectPool<T> pool, Collection<T> originalObjects, int poolStartIndex) {
+            final int size = originalObjects.size();
+            @SuppressWarnings("unchecked")
+            final UniqueObject<T>[] uniqueObjectArray = (UniqueObject<T>[]) new UniqueObject[size];
+            final Iterator<T> iterator = originalObjects.iterator();
+            for (int i = 0; i < size; ++i, ++poolStartIndex) {
+                if (!iterator.hasNext()) {
+                    throw new IllegalStateException("List iterator terminated unexpectedly");
+                }
+                long gotId;
+                if (pool.nextId() == poolStartIndex) {
+                    final UniqueObject<T> uniqueObject = pool.ofUnique(iterator.next());
+                    if (uniqueObject.id() == poolStartIndex) {
+                        uniqueObjectArray[i] = uniqueObject;
+                        continue;
+                    } else {
+                        gotId = uniqueObject.id();
+                    }
+                } else {
+                    gotId = pool.nextId();
+                }
+                throw new IllegalStateException("Expected index " + poolStartIndex + ", but got " + gotId + "!");
+            }
+            return uniqueObjectArray;
+        }
+    }
+
+    public static final class UniqueObject<T> implements Comparable<UniqueObject<T>> {
+        private final long id;
+        private final T o;
+
+        UniqueObject(long id, T o) {
+            this.id = id;
+            this.o = o;
+        }
+
+        public T get() {
+            return o;
+        }
+
+        public long id() {
+            return id;
+        }
+
+        @Override
+        public int hashCode() {
+            return (int) id;
+        }
+
+        @Override
+        public int compareTo(UniqueObject<T> other) {
+            return Long.compare(this.id, other.id);
+        }
+
+        @Override
+        public String toString() {
+            return "UniqueObject{" +
+                    "id=" + id +
+                    ", o=" + o +
+                    '}';
+        }
+    }
+
+
     public static final class StructureFilterCache {
-        public static final Map<BlockPos, Set<BlockBreakStructure>> M_OUT_OF_WORLD;
-        public static final Map<BlockPos, Set<BlockBreakStructure>> M_PLACEABLE;
-        public static final Map<BlockPos, Set<BlockBreakStructure>> M_SOLID_BLOCK;
-        public static final Map<BlockPos, Set<BlockBreakStructure>> M_OTHER;
+        private static final UniqueObjectPool<BlockBreakStructure> STRUCTURE_UNIQUE_OBJECT_POOL = UniqueObjectPool.withSInt32Limit("StructureFilterCache.BlockBreakStructure");
+        private static final BlockBreakStructure[] STRUCTURES = AllStructures.toArray(new BlockBreakStructure[0]);
+        private static final int STRUCTURES_COUNT = STRUCTURES.length;
+        private static final UniqueObject<BlockBreakStructure>[] UNIQUE_STRUCTURES = UniqueObjectPool.createUniqueObjectArray(STRUCTURE_UNIQUE_OBJECT_POOL, STRUCTURES);
+        private static final UniqueObject<BlockPos>[] UNIQUE_POSITIONS = UniqueObjectPool.createUniqueObjectArray(UniqueObjectPool.withSInt32Limit("StructureFilterCache.BlockPos"), PositionsIn4Steps.posList);
+        // 这里用0来表示可用，1表示不可用，因为新建BitSet默认填充0
+        public static final Map<UniqueObject<BlockPos>, BitSet> M_OUT_OF_WORLD;
+        public static final Map<UniqueObject<BlockPos>, BitSet> M_PLACEABLE;
+        public static final Map<UniqueObject<BlockPos>, BitSet> M_SOLID_BLOCK;
+        public static final Map<UniqueObject<BlockPos>, BitSet> M_OTHER;
         static {
             //long time = System.nanoTime();
             //System.out.println("starting init StructureFilterCache");
-            final HashMap<BlockPos, Set<BlockBreakStructure>> mOOW = new HashMap<>();
-            final HashMap<BlockPos, Set<BlockBreakStructure>> mPlaceable = new HashMap<>();
-            final HashMap<BlockPos, Set<BlockBreakStructure>> mSolidBlock = new HashMap<>();
-            final HashMap<BlockPos, Set<BlockBreakStructure>> mOther = new HashMap<>();
-            for (BlockPos pos : PositionsIn4Steps.posList) {
-                final LinkedHashSet<BlockBreakStructure> sOOW = new LinkedHashSet<>();
-                final LinkedHashSet<BlockBreakStructure> sPlaceable = new LinkedHashSet<>();
-                final LinkedHashSet<BlockBreakStructure> sSolidBlock = new LinkedHashSet<>();
-                final LinkedHashSet<BlockBreakStructure> sOther = new LinkedHashSet<>();
-                for (BlockBreakStructure structure : AllStructures) {
+            final BitSet initnalSearchBitSet = new BitSet(STRUCTURES_COUNT);
+            initnalSearchBitSet.set(0, STRUCTURES_COUNT, true);
+            final HashMap<UniqueObject<BlockPos>, BitSet> mOOW = new HashMap<>();
+            final HashMap<UniqueObject<BlockPos>, BitSet> mPlaceable = new HashMap<>();
+            final HashMap<UniqueObject<BlockPos>, BitSet> mSolidBlock = new HashMap<>();
+            final HashMap<UniqueObject<BlockPos>, BitSet> mOther = new HashMap<>();
+            for (UniqueObject<BlockPos> uniquePos : UNIQUE_POSITIONS) {
+                final BlockPos pos = uniquePos.get();
+                final BitSet sOOW = (BitSet) initnalSearchBitSet.clone();
+                final BitSet sPlaceable = (BitSet) initnalSearchBitSet.clone();
+                final BitSet sSolidBlock = (BitSet) initnalSearchBitSet.clone();
+                final BitSet sOther = (BitSet) initnalSearchBitSet.clone();
+                for (UniqueObject<BlockBreakStructure> uniqueStructure : UNIQUE_STRUCTURES) {
+                    final BlockBreakStructure structure = uniqueStructure.get();
+                    final int id = (int) uniqueStructure.id();
                     if (structure.testForPosFilter(ComparablePredicate.CP_OUT_OF_WORLD, pos)) {
-                        sOOW.add(structure);
+                        sOOW.set(id, false);
                     }
                     if (structure.testForPosFilter(ComparablePredicate.CP_PLACEABLE, pos)) {
-                        sPlaceable.add(structure);
+                        sPlaceable.set(id, false);
                     }
                     if (structure.testForPosFilter(ComparablePredicate.CP_SOLID_BLOCK, pos)) {
-                        sSolidBlock.add(structure);
+                        sSolidBlock.set(id, false);
                     }
                     if (structure.testForPosFilter(ComparablePredicate.CP_OTHER, pos)) {
-                        sOther.add(structure);
+                        sOther.set(id, false);
                     }
                 }
-                mOOW.put(pos, Collections.unmodifiableSet(sOOW));
-                mPlaceable.put(pos, Collections.unmodifiableSet(sPlaceable));
-                mSolidBlock.put(pos, Collections.unmodifiableSet(sSolidBlock));
-                mOther.put(pos, Collections.unmodifiableSet(sOther));
+                mOOW.put(uniquePos, sOOW);
+                mPlaceable.put(uniquePos, sPlaceable);
+                mSolidBlock.put(uniquePos, sSolidBlock);
+                mOther.put(uniquePos, sOther);
             }
             M_OUT_OF_WORLD = Collections.unmodifiableMap(mOOW);
             M_PLACEABLE = Collections.unmodifiableMap(mPlaceable);
@@ -869,25 +1041,23 @@ public final class BlockFinder2 {
         private static final Iterable<PistonPowerInfo> EMPTY_ITERABLE = () -> EMPTY_ITERATOR;
 
         // 需要使用testBeforePlace二次测试
-        public static LinkedHashSet<BlockBreakStructure> findPossibleStructuresInCache(World world, BlockPos targetPos) {
-            final LinkedHashSet<BlockBreakStructure> possibleStructures = new LinkedHashSet<>(AllStructures);
-            for (BlockPos offsetPos : PositionsIn4Steps.posList) {
-                final BlockPos pos = targetPos.add(offsetPos);
+        public static Stream<BlockBreakStructure> findPossibleStructuresInCache(World world, BlockPos targetPos) {
+            final BitSet possibleStructures = new BitSet(STRUCTURES_COUNT);
+            for (UniqueObject<BlockPos> uniqueOffsetPos : UNIQUE_POSITIONS) {
+                final BlockPos pos = targetPos.add(uniqueOffsetPos.get());
                 final BlockState state = world.getBlockState(pos);
                 if (ComparablePredicate.CP_OUT_OF_WORLD.test(world, pos, state)) {
-                    possibleStructures.retainAll(M_OUT_OF_WORLD.get(offsetPos));
+                    possibleStructures.or(M_OUT_OF_WORLD.get(uniqueOffsetPos));
                 } else if (ComparablePredicate.CP_PLACEABLE.test(world, pos, state)) {
-                    possibleStructures.retainAll(M_PLACEABLE.get(offsetPos));
+                    possibleStructures.or(M_PLACEABLE.get(uniqueOffsetPos));
                 } else if (ComparablePredicate.CP_SOLID_BLOCK.test(world, pos, state)) {
-                    possibleStructures.retainAll(M_SOLID_BLOCK.get(offsetPos));
+                    possibleStructures.or(M_SOLID_BLOCK.get(uniqueOffsetPos));
                 } else {
-                    possibleStructures.retainAll(M_OTHER.get(offsetPos));
-                }
-                if (possibleStructures.isEmpty()) {
-                    return EMPTY_SET;
+                    possibleStructures.or(M_OTHER.get(uniqueOffsetPos));
                 }
             }
-            return possibleStructures;
+            possibleStructures.flip(0, STRUCTURES_COUNT); // TODO
+            return possibleStructures.stream().mapToObj((id) -> STRUCTURES[id]);
         }
 
         // 临时的把BlockBreakStructure转为PistonPowerInfo的替代方案
@@ -898,14 +1068,7 @@ public final class BlockFinder2 {
                 PowerBlockType powerBlockUsage,
                 boolean hasDependBlock
         ) {
-            Stream<BlockBreakStructure> stream;
-            {
-                final LinkedHashSet<BlockBreakStructure> possibleStructures = findPossibleStructuresInCache(world, targetPos);
-                if (possibleStructures.isEmpty()) {
-                    return EMPTY_ITERABLE;
-                }
-                stream = possibleStructures.stream();
-            }
+            Stream<BlockBreakStructure> stream = findPossibleStructuresInCache(world, targetPos);
             if (powerBlockUsage != PowerBlockType.Both) {
                 stream = stream.filter(structure -> structure.powerBlockType == powerBlockUsage);
             }
@@ -925,6 +1088,7 @@ public final class BlockFinder2 {
         private static <T> Iterable<T> stream2Iterable(Stream<T> stream) {
             return stream::iterator;
         }
+
     }
     public static final class PositionsIn4Steps {
         public static final List<BlockPos> posList;
