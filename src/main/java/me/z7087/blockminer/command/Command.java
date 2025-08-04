@@ -9,6 +9,7 @@ import me.z7087.blockminer.command.argument.BlockPosArgumentType;
 import me.z7087.blockminer.config.Config;
 import me.z7087.blockminer.util.enums.DistanceCalculationMode;
 import me.z7087.blockminer.util.enums.PowerBlockType;
+import me.z7087.blockminer.util.enums.SearchMode;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.block.Block;
 import net.minecraft.command.argument.BlockStateArgument;
@@ -232,6 +233,34 @@ public final class Command {
                                         return 1;
                                     }
                                     context.getSource().sendFeedback(Text.of("distance-calculation-mode already set to \"1.20.6\""));
+                                    return 0;
+                                })
+                        )
+                ).then(literal("search-mode")
+                        .executes((context) -> {
+                            context.getSource().sendFeedback(Text.of(BlockMinerMod.getInstance().getConfig().getSearchMode().toString()));
+                            return 1;
+                        })
+                        .then(literal("all")
+                                .executes(context -> {
+                                    Config config = BlockMinerMod.getInstance().getConfig();
+                                    if (config.getSearchMode() != SearchMode.All) {
+                                        config.setSearchMode(SearchMode.All);
+                                        BlockMinerMod.getInstance().tryToSaveConfig();
+                                        return 1;
+                                    }
+                                    context.getSource().sendFeedback(Text.of("search-mode already set to \"all\""));
+                                    return 0;
+                                })
+                        ).then(literal("simple")
+                                .executes(context -> {
+                                    Config config = BlockMinerMod.getInstance().getConfig();
+                                    if (config.getSearchMode() != SearchMode.Simple) {
+                                        config.setSearchMode(SearchMode.Simple);
+                                        BlockMinerMod.getInstance().tryToSaveConfig();
+                                        return 1;
+                                    }
+                                    context.getSource().sendFeedback(Text.of("search-mode already set to \"simple\""));
                                     return 0;
                                 })
                         )

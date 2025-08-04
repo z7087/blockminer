@@ -9,7 +9,6 @@ import me.z7087.blockminer.util.data.PistonPowerInfo;
 import me.z7087.blockminer.util.enums.PowerBlockType;
 import me.z7087.blockminer.util.enums.TaskState;
 import me.z7087.blockminer.util.finder.BlockFinder;
-import me.z7087.blockminer.util.finder.BlockFinder2;
 import net.minecraft.block.*;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
@@ -115,7 +114,7 @@ public class Task implements Comparable<Task> {
                     //BlockFinder.findStablePistons(world, targetPos, pistonList);
                     //ArrayList<PistonPowerInfo> pistonPowerInfos = new ArrayList<>();
                     //BlockFinder.findPowerBlockForPiston(world, targetPos, powerBlockUsage, pistonList, pistonPowerInfos, dependBlockIndex != -1);
-                    for (PistonPowerInfo pistonPowerInfo : BlockFinder2.StructureFilterCache.findPossibleStructuresInCacheTMP(world, targetPos, powerBlockUsage, dependBlockIndex != -1)) {
+                    for (PistonPowerInfo pistonPowerInfo : BlockMinerMod.getInstance().getConfig().getSearchMode().findPossibleStructures(world, targetPos, powerBlockUsage, dependBlockIndex != -1)) {
                         this.pistonPowerInfo = pistonPowerInfo;
                         final BlockPos dependBlockPos;
                         if (BlockUtils.playerCanTouchServerside(player, pistonPowerInfo.pistonPos, 1, false)

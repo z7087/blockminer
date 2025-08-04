@@ -7,6 +7,7 @@ import com.google.gson.stream.MalformedJsonException;
 import me.z7087.blockminer.BlockMinerMod;
 import me.z7087.blockminer.util.enums.DistanceCalculationMode;
 import me.z7087.blockminer.util.enums.PowerBlockType;
+import me.z7087.blockminer.util.enums.SearchMode;
 import me.z7087.final2constant.Constant;
 import me.z7087.final2constant.DynamicConstant;
 import me.z7087.final2constant.util.JavaHelper;
@@ -52,6 +53,7 @@ public abstract class Config {
                     (Supplier<DynamicConstant<Integer>> & Serializable) configEmptyImpl::pingSpikeThreshold,
                     (Supplier<DynamicConstant<PowerBlockType>> & Serializable) configEmptyImpl::powerBlockUsage,
                     (Supplier<DynamicConstant<DistanceCalculationMode>> & Serializable) configEmptyImpl::distanceCalculationMode,
+                    (Supplier<DynamicConstant<SearchMode>> & Serializable) configEmptyImpl::searchMode,
                     (Supplier<Set<Block>> & Serializable) configEmptyImpl::blockWhitelist,
                     (Supplier<Set<Block>> & Serializable) configEmptyImpl::dependBlockWhitelist,
                     (Supplier<Set<Item>> & Serializable) configEmptyImpl::dependBlockItemWhitelist
@@ -81,6 +83,7 @@ public abstract class Config {
         final DynamicConstant<Integer> pingSpikeThreshold = Constant.factory.ofMutable(0);
         final DynamicConstant<PowerBlockType> powerBlockUsage = Constant.factory.ofMutable(PowerBlockType.Both);
         final DynamicConstant<DistanceCalculationMode> distanceCalculationMode = Constant.factory.ofMutable(DistanceCalculationMode.currentClientVersion);
+        final DynamicConstant<SearchMode> searchMode = Constant.factory.ofMutable(SearchMode.All);
         final Set<Block> blockWhitelist = new HashSet<>();
 
         final Set<Block> dependBlockWhitelist = new HashSet<>();
@@ -93,6 +96,7 @@ public abstract class Config {
                     pingSpikeThreshold,
                     powerBlockUsage,
                     distanceCalculationMode,
+                    searchMode,
                     blockWhitelist,
                     dependBlockWhitelist,
                     dependBlockItemWhitelist
@@ -108,6 +112,7 @@ public abstract class Config {
     abstract DynamicConstant<Integer> pingSpikeThreshold();
     abstract DynamicConstant<PowerBlockType> powerBlockUsage();
     abstract DynamicConstant<DistanceCalculationMode> distanceCalculationMode();
+    abstract DynamicConstant<SearchMode> searchMode();
     public abstract Set<Block> blockWhitelist();
 
     public abstract Set<Block> dependBlockWhitelist();
@@ -280,6 +285,15 @@ public abstract class Config {
         distanceCalculationMode().sync();
     }
 
+    public SearchMode getSearchMode() {
+        return searchMode().orElseThrow();
+    }
+
+    public void setSearchMode(SearchMode value) {
+        searchMode().set(value);
+        searchMode().sync();
+    }
+
     private static final class ConfigTypeAdapter extends TypeAdapter<Config> {
         @Override
         public void write(JsonWriter out, Config config) throws IOException {
@@ -290,6 +304,7 @@ public abstract class Config {
             out.name("ping-spike-threshold").value(config.getPingSpikeThreshold());
             out.name("power-block-usage").value(config.getPowerBlockUsage().toString());
             out.name("distance-calculation-mode").value(config.getDistanceCalculationMode().toString());
+            out.name("search-mode").value(config.getSearchMode().toString());
             final Identifier defaultId = Registries.BLOCK.getDefaultId();
             {
                 out.name("whitelist").beginArray();
@@ -344,6 +359,10 @@ public abstract class Config {
                         }
                         case "distance-calculation-mode": {
                             config.setDistanceCalculationMode(DistanceCalculationMode.of(in.nextString()));
+                            break;
+                        }
+                        case "search-mode": {
+                            config.setSearchMode(SearchMode.of(in.nextString()));
                             break;
                         }
                         case "whitelist": {
