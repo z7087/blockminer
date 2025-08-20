@@ -21,9 +21,9 @@ public final class SimpleBlockFinder {
                 BlockFinder.AllStructures
                         .stream()
                         .filter(structure -> {
-                            if (BlockUtils.getDistance(BlockPos.ORIGIN, structure.powerBlockOffset) > 2)
+                            if (BlockUtils.getDistance(BlockPos.ORIGIN, structure.powerBlockOffsetPos) > 2)
                                 return false;
-                            return BlockUtils.getDistance(BlockPos.ORIGIN, structure.powerBlockOffset.offset(structure.powerBlockFace.getOpposite())) <= 2;
+                            return BlockUtils.getDistance(BlockPos.ORIGIN, structure.powerBlockOffsetPos.offset(structure.powerBlockFace.getOpposite())) <= 2;
                         })
                         .collect(Collectors.toList())
         );
@@ -110,7 +110,7 @@ public final class SimpleBlockFinder {
                             .map(structure -> new PistonPowerInfo(
                                     targetPos.offset(structure.pistonOffset),
                                     structure.pistonFace,
-                                    targetPos.add(structure.powerBlockOffset),
+                                    targetPos.add(structure.powerBlockOffsetPos),
                                     structure.powerBlockFace,
                                     structure.powerBlockType)
                             )

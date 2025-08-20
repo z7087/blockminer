@@ -1,14 +1,13 @@
 package me.z7087.blockminer.util.constants;
 
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import me.z7087.blockminer.util.BlockUtils;
 import me.z7087.blockminer.util.finder.BlockFinder;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
+import org.jetbrains.annotations.NotNull;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashSet;
-import java.util.List;
+import java.util.*;
 
 public final class PositionsInSteps {
     public static final class S1 {
@@ -125,6 +124,18 @@ public final class PositionsInSteps {
                 tmpPosSet.clear();
             }
             return posSet;
+        }
+    }
+
+    public static final class DeduplicationInS4 {
+        private static final ObjectOpenHashSet<BlockPos> deduplicationSet = new ObjectOpenHashSet<>(S4.posList);
+        static {
+            deduplicationSet.trim();
+        }
+
+        public static BlockPos deduplicate(@NotNull BlockPos pos) {
+            final BlockPos deduplicatedPos = deduplicationSet.get(pos);
+            return deduplicatedPos != null ? deduplicatedPos : pos;
         }
     }
 }

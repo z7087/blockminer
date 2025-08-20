@@ -12,6 +12,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Vec3i;
 import net.minecraft.world.World;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.Serializable;
 import java.lang.invoke.MethodHandle;
@@ -72,10 +73,10 @@ public final class BlockFinder {
         //    return cmp;
 
         // 能源方块和能源方块的依赖方块离中心点越近越好
-        cmp = Integer.compare(BlockUtils.getDistance(BlockPos.ORIGIN, a.powerBlockOffset), BlockUtils.getDistance(BlockPos.ORIGIN, b.powerBlockOffset));
+        cmp = Integer.compare(BlockUtils.getDistance(BlockPos.ORIGIN, a.powerBlockOffsetPos), BlockUtils.getDistance(BlockPos.ORIGIN, b.powerBlockOffsetPos));
         if (cmp != 0)
             return cmp;
-        return Integer.compare(BlockUtils.getDistance(BlockPos.ORIGIN, a.powerBlockOffset.offset(a.powerBlockFace.getOpposite())), BlockUtils.getDistance(BlockPos.ORIGIN, b.powerBlockOffset.offset(b.powerBlockFace.getOpposite())));
+        return Integer.compare(BlockUtils.getDistance(BlockPos.ORIGIN, a.powerBlockOffsetPos.offset(a.powerBlockFace.getOpposite())), BlockUtils.getDistance(BlockPos.ORIGIN, b.powerBlockOffsetPos.offset(b.powerBlockFace.getOpposite())));
     };
 
     public static final Set<BlockBreakStructure> AllStructures;
@@ -347,7 +348,7 @@ public final class BlockFinder {
             map.put(pO.east(), Direction.EAST);
             PosOffset2DirectionMap = Collections.unmodifiableMap(map);
         }
-        private static Direction getPistonOffsetDirectionFromPosOffset(BlockPos pistonOffsetPos) {
+        private static @NotNull Direction getPistonOffsetDirectionFromPosOffset(@NotNull BlockPos pistonOffsetPos) {
             final Direction pistonOffset = PosOffset2DirectionMap.get(pistonOffsetPos);
             if (pistonOffset == null) {
                 throw new IllegalArgumentException("Don't know how to break target block with piston offset position: " + pistonOffsetPos);
@@ -355,65 +356,95 @@ public final class BlockFinder {
             return pistonOffset;
         }
 
-        public final Direction pistonOffset;
-        public final Direction pistonFace;
-        public final BlockPos powerBlockOffset;
-        public final Direction powerBlockFace;
-        public final PowerBlockType powerBlockType;
+        @NotNull public final Direction pistonOffset;
+        @NotNull public final Direction pistonFace;
+        @NotNull public final BlockPos powerBlockOffsetPos;
+        @NotNull public final Direction powerBlockFace;
+        @NotNull public final PowerBlockType powerBlockType;
         public final boolean useSolidBlockBetweenPowerBlockAndPiston;
 
+        @NotNull public final transient BlockPos pistonOffsetPos;
+        @NotNull public final transient BlockPos pistonHeadOffsetPos;
+        @NotNull public final transient BlockPos dependBlockOffsetPos;
+        @NotNull public final transient BlockPos strongPoweringBlockByPowerBlockOffsetPos;
         public final transient boolean useTargetBlockForPowerBlockDepending;
 
-        private final transient BlockBoxHelper structureRange;
+        @NotNull private final transient BlockBoxHelper structureRange;
 
         private final transient int hash;
 
         BlockBreakStructure(
-                Direction pistonOffset,
-                Direction pistonFace,
-                BlockPos powerBlockOffset,
-                Direction powerBlockFace,
-                PowerBlockType powerBlockType,
+                @NotNull Direction pistonOffset,
+                @NotNull Direction pistonFace,
+                @NotNull BlockPos powerBlockOffsetPos,
+                @NotNull Direction powerBlockFace,
+                @NotNull PowerBlockType powerBlockType,
                 boolean useSolidBlockBetweenPowerBlockAndPiston
         ) {
-            this.pistonOffset = Objects.requireNonNull(pistonOffset);
-            this.pistonFace = Objects.requireNonNull(pistonFace);
-            this.powerBlockOffset = Objects.requireNonNull(powerBlockOffset);
-            this.powerBlockFace = Objects.requireNonNull(powerBlockFace);
+            this.pistonOffset = pistonOffset;
+            this.pistonFace = pistonFace;
+            this.powerBlockOffsetPos = PositionsInSteps.DeduplicationInS4.deduplicate(
+                    powerBlockOffsetPos
+            );
+            this.powerBlockFace = powerBlockFace;
             if (powerBlockType == PowerBlockType.Both) {
                 throw new IllegalArgumentException("powerBlockType == PowerBlockType.Both");
             }
-            this.powerBlockType = Objects.requireNonNull(powerBlockType);
-
-            final BlockPos dependBlockOffset = powerBlockOffset.offset(powerBlockFace.getOpposite());
-            this.useTargetBlockForPowerBlockDepending = BlockPos.ORIGIN.equals(dependBlockOffset);
+            this.powerBlockType = powerBlockType;
             this.useSolidBlockBetweenPowerBlockAndPiston = useSolidBlockBetweenPowerBlockAndPiston;
 
-            final BlockPos pistonOffsetPos = BlockPos.ORIGIN.offset(pistonOffset);
-            final BlockPos pistonHeadOffsetPos = pistonOffsetPos.offset(pistonFace);
+            final BlockPos pistonOffsetPos = PositionsInSteps.DeduplicationInS4.deduplicate(
+                    BlockPos.ORIGIN.offset(pistonOffset)
+            );
+            final BlockPos pistonHeadOffsetPos = PositionsInSteps.DeduplicationInS4.deduplicate(
+                    pistonOffsetPos.offset(pistonFace)
+            );
+            this.pistonOffsetPos = pistonOffsetPos;
+            this.pistonHeadOffsetPos = pistonHeadOffsetPos;
+            final BlockPos dependBlockOffsetPos = PositionsInSteps.DeduplicationInS4.deduplicate(
+                    powerBlockOffsetPos.offset(powerBlockFace.getOpposite())
+            );
+            this.dependBlockOffsetPos = dependBlockOffsetPos;
+            switch (powerBlockType) {
+                case RedstoneTorch: {
+                    this.strongPoweringBlockByPowerBlockOffsetPos = PositionsInSteps.DeduplicationInS4.deduplicate(
+                            powerBlockOffsetPos.up()
+                    );
+                    break;
+                }
+                case Lever: {
+                    this.strongPoweringBlockByPowerBlockOffsetPos = dependBlockOffsetPos;
+                    break;
+                }
+                default: {
+                    throw new AssertionError();
+                }
+            }
+            this.useTargetBlockForPowerBlockDepending = BlockPos.ORIGIN.equals(dependBlockOffsetPos);
+
             this.structureRange = BlockBoxHelper.encompassPositionsAt000(
                     Arrays.asList(
                             pistonOffsetPos,
                             pistonHeadOffsetPos,
-                            powerBlockOffset,
-                            dependBlockOffset
+                            powerBlockOffsetPos,
+                            dependBlockOffsetPos
                     )
             );
             this.hash = this.calcHash();
         }
 
         BlockBreakStructure(
-                BlockPos pistonOffsetPos,
-                Direction pistonFace,
-                BlockPos powerBlockOffset,
-                Direction powerBlockFace,
-                PowerBlockType powerBlockType,
+                @NotNull BlockPos pistonOffsetPos,
+                @NotNull Direction pistonFace,
+                @NotNull BlockPos powerBlockOffsetPos,
+                @NotNull Direction powerBlockFace,
+                @NotNull PowerBlockType powerBlockType,
                 boolean useSolidBlockBetweenPowerBlockAndPiston
         ) {
             this(
                     getPistonOffsetDirectionFromPosOffset(pistonOffsetPos),
                     pistonFace,
-                    powerBlockOffset,
+                    powerBlockOffsetPos,
                     powerBlockFace,
                     powerBlockType,
                     useSolidBlockBetweenPowerBlockAndPiston
@@ -421,12 +452,12 @@ public final class BlockFinder {
         }
 
         BlockBreakStructure(
-                BlockPos targetPos,
-                BlockPos pistonPos,
-                Direction pistonFace,
-                BlockPos powerBlockPos,
-                Direction powerBlockFace,
-                PowerBlockType powerBlockType,
+                @NotNull BlockPos targetPos,
+                @NotNull BlockPos pistonPos,
+                @NotNull Direction pistonFace,
+                @NotNull BlockPos powerBlockPos,
+                @NotNull Direction powerBlockFace,
+                @NotNull PowerBlockType powerBlockType,
                 boolean useSolidBlockBetweenPowerBlockAndPiston
         ) {
             this(
@@ -446,19 +477,19 @@ public final class BlockFinder {
                     && BlockUtils.isReplaceable(world.getBlockState(pistonPos))
                     && world.canPlace(stoneState, pistonPos, ShapeContext.absent())
             ) {
-                final BlockPos pistonHeadPos = pistonPos.offset(pistonFace);
+                final BlockPos pistonHeadPos = targetPos.add(pistonHeadOffsetPos);
                 if (world.isInBuildLimit(pistonHeadPos)
                         && BlockUtils.isReplaceable(world.getBlockState(pistonHeadPos))
                         && world.canPlace(stoneState, pistonHeadPos, ShapeContext.absent())
                         && BlockFinder.isPistonPlaceSafe(world, pistonPos, pistonFace)
                 ) {
-                    final BlockPos powerBlockPos = targetPos.add(powerBlockOffset);
+                    final BlockPos powerBlockPos = targetPos.add(powerBlockOffsetPos);
                     if (world.isInBuildLimit(powerBlockPos)
                             && BlockUtils.isReplaceable(world.getBlockState(powerBlockPos))
                     ) {
-                        final BlockPos dependBlockPos = powerBlockPos.offset(powerBlockFace.getOpposite());
+                        final BlockPos dependBlockPos = targetPos.add(dependBlockOffsetPos);
                         final BlockState dependBlockState;
-                        final BlockPos strongPoweringBlockByPowerBlockPos = powerBlockType.isRedstoneTorch() ? powerBlockPos.up() : dependBlockPos;
+                        final BlockPos strongPoweringBlockByPowerBlockPos = targetPos.add(strongPoweringBlockByPowerBlockOffsetPos);
                         final BlockState strongPoweringBlockByPowerBlockState = world.getBlockState(strongPoweringBlockByPowerBlockPos);
                         if (world.isInBuildLimit(dependBlockPos)
                                 && (
@@ -534,7 +565,7 @@ public final class BlockFinder {
                         return false;
                     }
                 }
-                final BlockPos pistonHeadPos = pistonPos.offset(pistonFace);
+                final BlockPos pistonHeadPos = targetPos.add(pistonHeadOffsetPos);
                 final BlockState pistonHeadPosState = world.getBlockState(pistonHeadPos);
                 if (!pistonHeadPosState.isAir() && !(pistonHeadPosState.getBlock() instanceof PistonExtensionBlock)) {
                     if (pistonHeadPosState.getBlock() instanceof PistonHeadBlock) {
@@ -547,7 +578,7 @@ public final class BlockFinder {
                 }
             }
             {
-                final BlockPos powerBlockPos = targetPos.add(powerBlockOffset);
+                final BlockPos powerBlockPos = targetPos.add(powerBlockOffsetPos);
                 {
                     final BlockState powerBlockPosState = world.getBlockState(powerBlockPos);
                     final Block powerBlockPosBlock = powerBlockPosState.getBlock();
@@ -596,7 +627,7 @@ public final class BlockFinder {
                     }
                 }
                 if (useSolidBlockBetweenPowerBlockAndPiston) {
-                    final BlockPos strongPoweringBlockByPowerBlockPos = powerBlockType.isRedstoneTorch() ? powerBlockPos.up() : powerBlockPos.offset(powerBlockFace.getOpposite());
+                    final BlockPos strongPoweringBlockByPowerBlockPos = targetPos.add(strongPoweringBlockByPowerBlockOffsetPos);
                     //noinspection RedundantIfStatement
                     if (!world.getBlockState(strongPoweringBlockByPowerBlockPos).isSolidBlock(world, strongPoweringBlockByPowerBlockPos))
                         return false;
@@ -612,37 +643,31 @@ public final class BlockFinder {
                 }
                 case CP_PLACEABLE: {
                     if (useSolidBlockBetweenPowerBlockAndPiston) {
-                        final BlockPos strongPoweringBlockByPowerBlockPos = powerBlockType.isRedstoneTorch() ? powerBlockOffset.up() : powerBlockOffset.offset(powerBlockFace.getOpposite());
-                        return !strongPoweringBlockByPowerBlockPos.equals(offsetPos);
+                        return !strongPoweringBlockByPowerBlockOffsetPos.equals(offsetPos);
                     }
                     return true;
                 }
                 case CP_SOLID_BLOCK: {
                     if (!this.structureRange.contains(offsetPos))
                         return true;
-                    final BlockPos pistonOffsetPos = BlockPos.ORIGIN.offset(pistonOffset);
                     if (pistonOffsetPos.equals(offsetPos)) {
                         return false;
                     }
-                    final BlockPos pistonHeadOffsetPos = pistonOffsetPos.offset(pistonFace);
                     if (pistonHeadOffsetPos.equals(offsetPos)) {
                         return false;
                     }
-                    return !powerBlockOffset.equals(offsetPos);
+                    return !powerBlockOffsetPos.equals(offsetPos);
                 }
                 case CP_OTHER:
                 default: {
-                    final BlockPos dependBlockOffsetPos = powerBlockOffset.offset(powerBlockFace.getOpposite());
                     if (this.structureRange.contains(offsetPos)) {
-                        final BlockPos pistonOffsetPos = BlockPos.ORIGIN.offset(pistonOffset);
                         if (pistonOffsetPos.equals(offsetPos)) {
                             return false;
                         }
-                        final BlockPos pistonHeadOffsetPos = pistonOffsetPos.offset(pistonFace);
                         if (pistonHeadOffsetPos.equals(offsetPos)) {
                             return false;
                         }
-                        if (powerBlockOffset.equals(offsetPos)) {
+                        if (powerBlockOffsetPos.equals(offsetPos)) {
                             return false;
                         }
                         if (dependBlockOffsetPos.equals(offsetPos)) {
@@ -650,8 +675,7 @@ public final class BlockFinder {
                         }
                     }
                     if (useSolidBlockBetweenPowerBlockAndPiston) {
-                        final BlockPos strongPoweringBlockByPowerBlockPos = powerBlockType.isRedstoneTorch() ? powerBlockOffset.up() : dependBlockOffsetPos;
-                        return !strongPoweringBlockByPowerBlockPos.equals(offsetPos);
+                        return !strongPoweringBlockByPowerBlockOffsetPos.equals(offsetPos);
                     }
                     return true;
                 }
@@ -665,7 +689,7 @@ public final class BlockFinder {
             final BlockBreakStructure structure = (BlockBreakStructure) o;
             return pistonOffset == structure.pistonOffset
                     && pistonFace == structure.pistonFace
-                    && powerBlockOffset.equals(structure.powerBlockOffset)
+                    && powerBlockOffsetPos.equals(structure.powerBlockOffsetPos)
                     && powerBlockFace == structure.powerBlockFace
                     && powerBlockType == structure.powerBlockType;
         }
@@ -675,7 +699,7 @@ public final class BlockFinder {
             return "BlockBreakStructure{" +
                     "pistonOffset=" + pistonOffset +
                     ", pistonFace=" + pistonFace +
-                    ", powerBlockOffset=" + powerBlockOffset +
+                    ", powerBlockOffset=" + powerBlockOffsetPos +
                     ", powerBlockFace=" + powerBlockFace +
                     ", powerBlockType=" + powerBlockType +
                     ", useSolidBlockBetweenPowerBlockAndPiston=" + useSolidBlockBetweenPowerBlockAndPiston +
@@ -686,7 +710,7 @@ public final class BlockFinder {
         private int calcHash() {
             int result = pistonOffset.hashCode();
             result = 31 * result + pistonFace.hashCode();
-            result = 31 * result + powerBlockOffset.hashCode();
+            result = 31 * result + powerBlockOffsetPos.hashCode();
             result = 31 * result + powerBlockFace.hashCode();
             result = 31 * result + powerBlockType.hashCode();
             return result;
@@ -706,7 +730,7 @@ public final class BlockFinder {
             cmp = this.pistonFace.compareTo(o.pistonFace);
             if (cmp != 0)
                 return cmp;
-            cmp = this.powerBlockOffset.compareTo(o.powerBlockOffset);
+            cmp = this.powerBlockOffsetPos.compareTo(o.powerBlockOffsetPos);
             if (cmp != 0)
                 return cmp;
             cmp = this.powerBlockFace.compareTo(o.powerBlockFace);
@@ -1094,6 +1118,7 @@ public final class BlockFinder {
             //System.out.println("starting init StructureFilterCache");
             final BitSet initnalSearchBitSet = new BitSet(STRUCTURES.size());
             initnalSearchBitSet.set(0, STRUCTURES.size(), true);
+
             final BitSet[] mOOW = new BitSet[UNIQUE_POSITIONS.length];
             final BitSet[] mPlaceable = mOOW.clone();
             final BitSet[] mSolidBlock = mOOW.clone();
@@ -1173,7 +1198,7 @@ public final class BlockFinder {
                     .map(structure -> new PistonPowerInfo(
                             targetPos.offset(structure.pistonOffset),
                             structure.pistonFace,
-                            targetPos.add(structure.powerBlockOffset),
+                            targetPos.add(structure.powerBlockOffsetPos),
                             structure.powerBlockFace,
                             structure.powerBlockType)
                     )
