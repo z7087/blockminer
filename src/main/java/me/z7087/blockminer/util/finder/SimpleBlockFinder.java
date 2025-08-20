@@ -2,7 +2,7 @@ package me.z7087.blockminer.util.finder;
 
 import me.z7087.blockminer.util.BlockUtils;
 import me.z7087.blockminer.util.constants.PositionsInSteps;
-import me.z7087.blockminer.util.data.PistonPowerInfo;
+import me.z7087.blockminer.util.data.*;
 import me.z7087.blockminer.util.enums.PowerBlockType;
 import me.z7087.blockminer.util.finder.BlockFinder.*;
 import net.minecraft.block.BlockState;
