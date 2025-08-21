@@ -8,6 +8,7 @@ import net.minecraft.block.*;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
 import net.minecraft.world.World;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 import java.util.function.BiFunction;
@@ -409,7 +410,7 @@ public final class BlockFinder {
         }
 
         // 需要使用testBeforePlace二次测试
-        public static Stream<BlockBreakStructure> findPossibleStructuresInCache(World world, BlockPos targetPos) {
+        public static @NotNull Stream<BlockBreakStructure> findPossibleStructuresInCache(@NotNull World world, @NotNull BlockPos targetPos) {
             final BitSet possibleStructures = new BitSet(STRUCTURES.size());
             for (int uniquePosId = 0; uniquePosId < UNIQUE_POSITIONS.length; ++uniquePosId) {
                 final UniqueObject<BlockPos> uniqueOffsetPos = UNIQUE_POSITIONS[uniquePosId];
@@ -429,33 +430,19 @@ public final class BlockFinder {
             return possibleStructures.stream().mapToObj((id) -> STRUCTURES.getOriginalObjects()[id]);
         }
 
-        // 临时的把BlockBreakStructure转为PistonPowerInfo的替代方案
-        // TODO 在Task里适配BlockBreakStructure
-        public static Iterable<PistonPowerInfo> findPossibleStructuresInCacheTMP(
-                World world,
-                BlockPos targetPos,
-                PowerBlockType powerBlockUsage,
+        public static @NotNull Stream<BlockBreakStructureFull> findPossibleFullStructuresInCache(
+                @NotNull World world,
+                @NotNull BlockPos targetPos,
+                @NotNull PowerBlockType powerBlockUsage,
                 boolean hasDependBlock
         ) {
             Stream<BlockBreakStructure> stream = findPossibleStructuresInCache(world, targetPos);
             if (powerBlockUsage != PowerBlockType.Both) {
                 stream = stream.filter(structure -> structure.powerBlockType == powerBlockUsage);
             }
-            return stream2Iterable(
-                    stream
+            return stream
                     .filter(structure -> structure.testBeforePlace(world, targetPos, hasDependBlock))
-                    .map(structure -> new PistonPowerInfo(
-                            targetPos.offset(structure.pistonOffset),
-                            structure.pistonFace,
-                            targetPos.add(structure.powerBlockOffsetPos),
-                            structure.powerBlockFace,
-                            structure.powerBlockType)
-                    )
-            );
-        }
-
-        private static <T> Iterable<T> stream2Iterable(Stream<T> stream) {
-            return stream::iterator;
+                    .map(structure -> BlockBreakStructureFull.of(targetPos, structure));
         }
 
     }

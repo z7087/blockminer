@@ -5,7 +5,7 @@ import me.z7087.blockminer.mixin.minecraft.client.network.ClientPlayerInteractio
 import me.z7087.blockminer.util.BlockUtils;
 import me.z7087.blockminer.util.InventoryUtils;
 import me.z7087.blockminer.util.RotationUtils;
-import me.z7087.blockminer.util.data.PistonPowerInfo;
+import me.z7087.blockminer.util.data.BlockBreakStructureFull;
 import me.z7087.blockminer.util.enums.PowerBlockType;
 import me.z7087.blockminer.util.enums.TaskState;
 import me.z7087.blockminer.util.finder.BlockFinder;
@@ -32,7 +32,7 @@ public class Task implements Comparable<Task> {
     private int pistonIndex, dependBlockIndex;
     private int redstoneTorchIndex, leverIndex;
     private int pickaxeIndex;
-    private PistonPowerInfo pistonPowerInfo;
+    private BlockBreakStructureFull structure;
     private int waitTicks = 0;
     private float blockBreakingDelta;
     private boolean isMining = false;
@@ -114,21 +114,20 @@ public class Task implements Comparable<Task> {
                     //BlockFinder.findStablePistons(world, targetPos, pistonList);
                     //ArrayList<PistonPowerInfo> pistonPowerInfos = new ArrayList<>();
                     //BlockFinder.findPowerBlockForPiston(world, targetPos, powerBlockUsage, pistonList, pistonPowerInfos, dependBlockIndex != -1);
-                    for (PistonPowerInfo pistonPowerInfo : BlockMinerMod.getInstance().getConfig().getSearchMode().findPossibleStructures(world, targetPos, powerBlockUsage, dependBlockIndex != -1)) {
-                        this.pistonPowerInfo = pistonPowerInfo;
-                        final BlockPos dependBlockPos;
-                        if (BlockUtils.playerCanTouchServerside(player, pistonPowerInfo.pistonPos, 1, false)
-                                && BlockUtils.playerCanTouchServerside(player, pistonPowerInfo.powerBlockPos, 1, false)
-                                && BlockUtils.playerCanTouchServerside(player, (dependBlockPos = pistonPowerInfo.powerBlockPos.offset(pistonPowerInfo.powerBlockFace.getOpposite())), 1, false)
-                                && world.canPlace(Blocks.STONE.getDefaultState(), pistonPowerInfo.pistonPos, ShapeContext.absent())
+                    for (BlockBreakStructureFull structure : (Iterable<? extends BlockBreakStructureFull>) BlockMinerMod.getInstance().getConfig().getSearchMode().findPossibleStructures(world, targetPos, powerBlockUsage, dependBlockIndex != -1)::iterator) {
+                        this.structure = structure;
+                        if (BlockUtils.playerCanTouchServerside(player, structure.getPistonPos(), 1, false)
+                                && BlockUtils.playerCanTouchServerside(player, structure.getPowerBlockPos(), 1, false)
+                                && BlockUtils.playerCanTouchServerside(player, structure.getDependBlockPos(), 1, false)
+                                && world.canPlace(Blocks.STONE.getDefaultState(), structure.getPistonPos(), ShapeContext.absent())
                                 // 当依赖方块是目标方块时，无法创建无头活塞
-                                && (!BlockMinerMod.getInstance().getConfig().isHeadlessPistonMode() || !dependBlockPos.equals(targetPos))) {
+                                && (!BlockMinerMod.getInstance().getConfig().isHeadlessPistonMode() || !structure.getDependBlockPos().equals(targetPos))) {
                             // 朝上下的活塞的朝向可以立即到位，其他方向的不行
-                            switch (pistonPowerInfo.pistonFace) {
+                            switch (structure.getPistonFace()) {
                                 case UP:
                                 case DOWN: {
                                     // 如果活塞朝上，面向下，否则面向上
-                                    float pitch = pistonPowerInfo.pistonFace == Direction.UP ? 90F : -90F;
+                                    float pitch = structure.getPistonFace() == Direction.UP ? 90F : -90F;
                                     if (rotationUtils.canSetPitch(pitch)) {
                                         assertTrue(rotationUtils.trySetPitch(pitch));
                                         rotationUtils.updateLocation(player);
@@ -142,7 +141,7 @@ public class Task implements Comparable<Task> {
                                     float pitch = 0;
                                     float yaw;
                                     // 假定玩家面向正南时 yaw = 0
-                                    switch (pistonPowerInfo.pistonFace) {
+                                    switch (structure.getPistonFace()) {
                                         case SOUTH: {
                                             // 朝北
                                             yaw = 180F;
@@ -186,20 +185,19 @@ public class Task implements Comparable<Task> {
                     // fall down
                 }
                 case PlaceBlocksWithChecks: {
-                    BlockPos dependBlockPos = pistonPowerInfo.powerBlockPos.offset(pistonPowerInfo.powerBlockFace.getOpposite());
-                    final BlockState dependBlockState = world.getBlockState(dependBlockPos);
+                    final BlockState dependBlockState = world.getBlockState(structure.getDependBlockPos());
                     if (inventory.getStack(pistonIndex).getItem() != Items.PISTON
                             || (dependBlockIndex != -1 && !BlockMinerMod.getInstance().getConfig().dependBlockWhitelistContains(inventory.getStack(dependBlockIndex).getItem()))
                             || (redstoneTorchIndex != -1 && inventory.getStack(redstoneTorchIndex).getItem() != Items.REDSTONE_TORCH)
                             || (leverIndex != -1 && inventory.getStack(leverIndex).getItem() != Items.LEVER)
-                            || !BlockUtils.isReplaceable(world.getBlockState(pistonPowerInfo.pistonPos))
-                            || !world.canPlace(Blocks.STONE.getDefaultState(), pistonPowerInfo.pistonPos, ShapeContext.absent())
-                            || !BlockUtils.isReplaceable(world.getBlockState(pistonPowerInfo.powerBlockPos))
+                            || !BlockUtils.isReplaceable(world.getBlockState(structure.getPistonPos()))
+                            || !world.canPlace(Blocks.STONE.getDefaultState(), structure.getPistonPos(), ShapeContext.absent())
+                            || !BlockUtils.isReplaceable(world.getBlockState(structure.getPowerBlockPos()))
                             || (
-                            !BlockUtils.isReplaceable(world.getBlockState(dependBlockPos))
+                            !BlockUtils.isReplaceable(world.getBlockState(structure.getDependBlockPos()))
                                     && !(
-                                    dependBlockState.isSolidBlock(world, dependBlockPos)
-                                            && dependBlockState.isSideSolidFullSquare(world, dependBlockPos, pistonPowerInfo.powerBlockFace)
+                                    dependBlockState.isSolidBlock(world, structure.getDependBlockPos())
+                                            && dependBlockState.isSideSolidFullSquare(world, structure.getDependBlockPos(), structure.getPowerBlockFace())
                                             && !(dependBlockState.getBlock() instanceof PistonBlock)
                             )
                     )
@@ -208,9 +206,9 @@ public class Task implements Comparable<Task> {
                         retry();
                         break loop;
                     }
-                    if (!BlockUtils.playerCanTouchServerside(player, pistonPowerInfo.pistonPos, 1, false)
-                            || !BlockUtils.playerCanTouchServerside(player, pistonPowerInfo.powerBlockPos, 1, false)
-                            || !BlockUtils.playerCanTouchServerside(player, dependBlockPos, 1, false)) {
+                    if (!BlockUtils.playerCanTouchServerside(player, structure.getPistonPos(), 1, false)
+                            || !BlockUtils.playerCanTouchServerside(player, structure.getPowerBlockPos(), 1, false)
+                            || !BlockUtils.playerCanTouchServerside(player, structure.getDependBlockPos(), 1, false)) {
                         // 距离不够，重新找
                         retry();
                         break loop;
@@ -222,7 +220,7 @@ public class Task implements Comparable<Task> {
                         retry();
                         break loop;
                     }
-                    if (redstoneTorchIndex == -1 || !pistonPowerInfo.getPowerBlockType().isRedstoneTorch()) {
+                    if (redstoneTorchIndex == -1 || !structure.getPowerBlockType().isRedstoneTorch()) {
                         // 对于拉杆放置，检查是否无法使用拉杆
                         if (canSwitchHandDenyUse(player, inventory)) {
                             retry();
@@ -240,9 +238,9 @@ public class Task implements Comparable<Task> {
                                                 world,
                                                 Hand.OFF_HAND,
                                                 new BlockHitResult(
-                                                        Vec3d.of(pistonPowerInfo.pistonPos),
+                                                        Vec3d.of(structure.getPistonPos()),
                                                         Direction.DOWN,
-                                                        pistonPowerInfo.pistonPos,
+                                                        structure.getPistonPos(),
                                                         false
                                                 )
                                         )
@@ -254,8 +252,7 @@ public class Task implements Comparable<Task> {
                             break loop;
                         }
                     }
-                    BlockPos dependBlockPos = pistonPowerInfo.powerBlockPos.offset(pistonPowerInfo.powerBlockFace.getOpposite());
-                    if (BlockUtils.isReplaceable(world.getBlockState(dependBlockPos))) {
+                    if (BlockUtils.isReplaceable(world.getBlockState(structure.getDependBlockPos()))) {
                         if (dependBlockIndex == -1) {
                             // 本来那有个方块但消失了，手里又没有粘液块，回去重找
                             retry();
@@ -269,9 +266,9 @@ public class Task implements Comparable<Task> {
                                         world,
                                         Hand.OFF_HAND,
                                         new BlockHitResult(
-                                                Vec3d.of(dependBlockPos),
+                                                Vec3d.of(structure.getDependBlockPos()),
                                                 Direction.DOWN,
-                                                dependBlockPos,
+                                                structure.getDependBlockPos(),
                                                 false
                                         )
                                 )
@@ -280,7 +277,7 @@ public class Task implements Comparable<Task> {
                         assertTrue(result.isAccepted());
                     }
                     // 优先红石火把
-                    if (redstoneTorchIndex != -1 && pistonPowerInfo.getPowerBlockType().isRedstoneTorch()) {
+                    if (redstoneTorchIndex != -1 && structure.getPowerBlockType().isRedstoneTorch()) {
                         leverIndex = -1;
                         // 放在那个方块上
                         ActionResult result = InventoryUtils.moveToOffHandDuring(player,
@@ -290,15 +287,15 @@ public class Task implements Comparable<Task> {
                                         world,
                                         Hand.OFF_HAND,
                                         new BlockHitResult(
-                                                Vec3d.of(dependBlockPos),
-                                                pistonPowerInfo.powerBlockFace,
-                                                dependBlockPos,
+                                                Vec3d.of(structure.getDependBlockPos()),
+                                                structure.getPowerBlockFace(),
+                                                structure.getDependBlockPos(),
                                                 false
                                         )
                                 )
                         );
                         assertTrue(result.isAccepted());
-                    } else if (leverIndex != -1 && pistonPowerInfo.getPowerBlockType().isLever()) {
+                    } else if (leverIndex != -1 && structure.getPowerBlockType().isLever()) {
                         redstoneTorchIndex = -1;
                         // 放在那个方块上
                         ActionResult result = InventoryUtils.moveToOffHandDuring(player,
@@ -308,9 +305,9 @@ public class Task implements Comparable<Task> {
                                         world,
                                         Hand.OFF_HAND,
                                         new BlockHitResult(
-                                                Vec3d.of(dependBlockPos),
-                                                pistonPowerInfo.powerBlockFace,
-                                                dependBlockPos,
+                                                Vec3d.of(structure.getDependBlockPos()),
+                                                structure.getPowerBlockFace(),
+                                                structure.getDependBlockPos(),
                                                 false
                                         )
                                 )
@@ -324,9 +321,9 @@ public class Task implements Comparable<Task> {
                                         world,
                                         Hand.MAIN_HAND,
                                         new BlockHitResult(
-                                                Vec3d.of(pistonPowerInfo.powerBlockPos),
-                                                pistonPowerInfo.powerBlockFace,
-                                                pistonPowerInfo.powerBlockPos,
+                                                Vec3d.of(structure.getPowerBlockPos()),
+                                                structure.getPowerBlockFace(),
+                                                structure.getPowerBlockPos(),
                                                 false
                                         )
                                 )
@@ -346,7 +343,7 @@ public class Task implements Comparable<Task> {
                     }
                     Direction pistonToTargetBlockFace = null;
                     for (Direction face : BlockFinder.DIRECTIONS) {
-                        if (pistonPowerInfo.pistonPos.offset(face).equals(targetPos)) {
+                        if (structure.getPistonPos().offset(face).equals(targetPos)) {
                             pistonToTargetBlockFace = face;
                             break;
                         }
@@ -399,11 +396,11 @@ public class Task implements Comparable<Task> {
                             retry();
                             break loop;
                         }
-                        if (BlockUtils.playerCanTouchServerside(player, pistonPowerInfo.pistonPos, 1, true) && !BlockMinerMod.getInstance().getBlockBreakUtils().isModBreakingBlock()) {
+                        if (BlockUtils.playerCanTouchServerside(player, structure.getPistonPos(), 1, true) && !BlockMinerMod.getInstance().getBlockBreakUtils().isModBreakingBlock()) {
                             BlockMinerMod.getInstance().getBlockBreakUtils().setBreaking(true);
                             isMining = true;
                             interactionManager.cancelBlockBreaking();
-                            interactionManager.attackBlock(pistonPowerInfo.pistonPos, Direction.DOWN);
+                            interactionManager.attackBlock(structure.getPistonPos(), Direction.DOWN);
                         } else {
                             // 有别的任务在占用挖掘或者挖不到方块，一会再检查一遍
                             break loop;
@@ -433,18 +430,17 @@ public class Task implements Comparable<Task> {
                         InventoryUtils.setSelectedSlot(inventory, pickaxeIndex);
                         ((ClientPlayerInteractionManagerAccessor) interactionManager).invokeSyncSelectedSlot();
                     }
-                    if (!BlockUtils.playerCanTouchServerside(player, pistonPowerInfo.pistonPos, 1, true)) {
+                    if (!BlockUtils.playerCanTouchServerside(player, structure.getPistonPos(), 1, true)) {
                         rotationUtils.markKeepRotation();
                         // 太远挖不到活塞，延后
                         break loop;
                     }
-                    if (!BlockUtils.playerCanTouchServerside(player, pistonPowerInfo.powerBlockPos, 1, true)) {
+                    if (!BlockUtils.playerCanTouchServerside(player, structure.getPowerBlockPos(), 1, true)) {
                         rotationUtils.markKeepRotation();
                         // 太远碰不到能源方块，延后
                         break loop;
                     }
-                    BlockPos dependBlockPos = pistonPowerInfo.powerBlockPos.offset(pistonPowerInfo.powerBlockFace.getOpposite());
-                    if (redstoneTorchIndex != -1 && BlockMinerMod.getInstance().getConfig().isHeadlessPistonMode() && !BlockUtils.playerCanTouchServerside(player, pistonPowerInfo.powerBlockPos.offset(pistonPowerInfo.powerBlockFace.getOpposite()), 1, false)) {
+                    if (redstoneTorchIndex != -1 && BlockMinerMod.getInstance().getConfig().isHeadlessPistonMode() && !BlockUtils.playerCanTouchServerside(player, structure.getDependBlockPos(), 1, false)) {
                         rotationUtils.markKeepRotation();
                         // 如果是无头活塞模式，且此task使用红石火把，且太远碰不到红石火把依附的方块，延后
                         break loop;
@@ -456,7 +452,7 @@ public class Task implements Comparable<Task> {
                     }
                     if (redstoneTorchIndex != -1) {
                         // 打红石火把
-                        interactionManager.attackBlock(pistonPowerInfo.powerBlockPos, Direction.DOWN);
+                        interactionManager.attackBlock(structure.getPowerBlockPos(), Direction.DOWN);
                     } else {
                         // 拉拉杆
                         ActionResult result = InventoryUtils.useEmptyMainHandIfSneakingDuring(player,
@@ -466,9 +462,9 @@ public class Task implements Comparable<Task> {
                                         world,
                                         Hand.MAIN_HAND,
                                         new BlockHitResult(
-                                                Vec3d.of(pistonPowerInfo.powerBlockPos),
-                                                pistonPowerInfo.powerBlockFace,
-                                                pistonPowerInfo.powerBlockPos,
+                                                Vec3d.of(structure.getPowerBlockPos()),
+                                                structure.getPowerBlockFace(),
+                                                structure.getPowerBlockPos(),
                                                 false
                                         )
                                 )
@@ -486,18 +482,18 @@ public class Task implements Comparable<Task> {
                             retry();
                             break loop;
                         }
-                        interactionManager.attackBlock(pistonPowerInfo.pistonPos, Direction.DOWN);
-                        if (!world.getBlockState(pistonPowerInfo.pistonPos).isAir())
-                            world.setBlockState(pistonPowerInfo.pistonPos, Blocks.AIR.getDefaultState());
+                        interactionManager.attackBlock(structure.getPistonPos(), Direction.DOWN);
+                        if (!world.getBlockState(structure.getPistonPos()).isAir())
+                            world.setBlockState(structure.getPistonPos(), Blocks.AIR.getDefaultState());
                     } else {
-                        if (BlockUtils.getHardness(world.getBlockState(pistonPowerInfo.pistonPos)) < 0) {
+                        if (BlockUtils.getHardness(world.getBlockState(structure.getPistonPos())) < 0) {
                             // 怎么回事？byd活塞变基岩了？
                             retry();
                             break loop;
                         }
                         ClientPlayerInteractionManagerAccessor interactionManagerAccessor = (ClientPlayerInteractionManagerAccessor) interactionManager;
-                        while (interactionManager.isBreakingBlock() && interactionManagerAccessor.invokeIsCurrentlyBreaking(pistonPowerInfo.pistonPos))
-                            interactionManager.updateBlockBreakingProgress(pistonPowerInfo.pistonPos, Direction.DOWN);
+                        while (interactionManager.isBreakingBlock() && interactionManagerAccessor.invokeIsCurrentlyBreaking(structure.getPistonPos()))
+                            interactionManager.updateBlockBreakingProgress(structure.getPistonPos(), Direction.DOWN);
                         BlockMinerMod.getInstance().getBlockBreakUtils().setBreaking(false);
                         isMining = false;
                     }
@@ -514,9 +510,9 @@ public class Task implements Comparable<Task> {
                                             world,
                                             Hand.OFF_HAND,
                                             new BlockHitResult(
-                                                    Vec3d.of(dependBlockPos),
-                                                    pistonPowerInfo.powerBlockFace,
-                                                    dependBlockPos,
+                                                    Vec3d.of(structure.getDependBlockPos()),
+                                                    structure.getPowerBlockFace(),
+                                                    structure.getDependBlockPos(),
                                                     false
                                             )
                                     )
@@ -530,9 +526,9 @@ public class Task implements Comparable<Task> {
                                             world,
                                             Hand.MAIN_HAND,
                                             new BlockHitResult(
-                                                    Vec3d.of(pistonPowerInfo.powerBlockPos),
-                                                    pistonPowerInfo.powerBlockFace,
-                                                    pistonPowerInfo.powerBlockPos,
+                                                    Vec3d.of(structure.getPowerBlockPos()),
+                                                    structure.getPowerBlockFace(),
+                                                    structure.getPowerBlockPos(),
                                                     false
                                             )
                                     )
@@ -555,9 +551,9 @@ public class Task implements Comparable<Task> {
                                             world,
                                             Hand.OFF_HAND,
                                             new BlockHitResult(
-                                                    Vec3d.of(pistonPowerInfo.pistonPos),
+                                                    Vec3d.of(structure.getPistonPos()),
                                                     Direction.DOWN,
-                                                    pistonPowerInfo.pistonPos,
+                                                    structure.getPistonPos(),
                                                     false
                                             )
                                     )

@@ -6,6 +6,7 @@ import net.minecraft.util.math.Direction;
 
 import java.util.Objects;
 
+@Deprecated
 public final class PistonPowerInfo {
     public final BlockPos pistonPos;
     public final Direction pistonFace;

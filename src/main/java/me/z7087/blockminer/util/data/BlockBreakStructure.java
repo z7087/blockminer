@@ -153,6 +153,7 @@ public final class BlockBreakStructure implements Comparable<BlockBreakStructure
         );
     }
 
+    // 不含距离检测的事前判断
     public boolean testBeforePlace(World world, BlockPos targetPos, boolean hasDependBlock) {
         final BlockState stoneState = Blocks.STONE.getDefaultState();
         final BlockPos pistonPos = targetPos.offset(pistonOffset);

@@ -1,10 +1,12 @@
 package me.z7087.blockminer.util.enums;
 
-import me.z7087.blockminer.util.data.PistonPowerInfo;
+import me.z7087.blockminer.util.data.BlockBreakStructureFull;
 import me.z7087.blockminer.util.finder.BlockFinder;
 import me.z7087.blockminer.util.finder.SimpleBlockFinder;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
+
+import java.util.stream.Stream;
 
 public enum SearchMode {
     All("all"),
@@ -29,7 +31,7 @@ public enum SearchMode {
                 "No enum constant " + SearchMode.class.getCanonicalName() + "." + name);
     }
 
-    public Iterable<PistonPowerInfo> findPossibleStructures(
+    public Stream<BlockBreakStructureFull> findPossibleStructures(
             World world,
             BlockPos targetPos,
             PowerBlockType powerBlockUsage,
@@ -37,9 +39,9 @@ public enum SearchMode {
     ) {
         switch (this) {
             case All:
-                return BlockFinder.StructureFilterCache.findPossibleStructuresInCacheTMP(world, targetPos, powerBlockUsage, hasDependBlock);
+                return BlockFinder.StructureFilterCache.findPossibleFullStructuresInCache(world, targetPos, powerBlockUsage, hasDependBlock);
             case Simple:
-                return SimpleBlockFinder.StructureFilterCache.findPossibleStructuresInCacheTMP(world, targetPos, powerBlockUsage, hasDependBlock);
+                return SimpleBlockFinder.StructureFilterCache.findPossibleFullStructuresInCache(world, targetPos, powerBlockUsage, hasDependBlock);
         }
         throw new AssertionError();
     }
