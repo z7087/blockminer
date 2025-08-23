@@ -74,7 +74,13 @@ public final class BlockUtils {
         // <和<=号是源码里写的 尽量不要混用
         switch (mode) {
             case V1_20_6: {
-                double distance = 4.5 + additionalRange;
+                double distance = additionalRange +
+                        //#if MC >= 12006
+                        player.getBlockInteractionRange()
+                        //#else
+                        //$$ 4.5
+                        //#endif
+                        ;
                 Vec3d eyePos = getEyePos(player);
                 double eyePosX = eyePos.getX();
                 double eyePosY = eyePos.getY();
