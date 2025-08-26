@@ -11,6 +11,7 @@ import net.minecraft.entity.attribute.EntityAttributeInstance;
 import net.minecraft.entity.attribute.EntityAttributes;
 import net.minecraft.entity.effect.StatusEffectUtil;
 import net.minecraft.entity.effect.StatusEffects;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -33,6 +34,14 @@ public final class InventoryUtils {
     ;
 
     private InventoryUtils() {}
+
+    public static PlayerInventory getInventory(PlayerEntity player) {
+        //#if MC >= 11700
+        return player.getInventory();
+        //#else
+        //$$ return player.inventory;
+        //#endif
+    }
 
     public static DefaultedList<ItemStack> getMainStacks(PlayerInventory inventory) {
         //#if MC >= 12105

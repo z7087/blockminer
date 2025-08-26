@@ -1,64 +1,25 @@
 package me.z7087.blockminer.util;
 
-import me.z7087.final2constant.Constant;
-import me.z7087.final2constant.DynamicConstant;
-import me.z7087.final2constant.util.JavaHelper;
+import me.z7087.blockminer.BlockMinerMod;
 
-import java.io.Serializable;
-import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
-import java.util.function.Supplier;
-
-public abstract class BlockBreakUtils {
+// 易变量不要常量化，编译也需要时间
+public final class BlockBreakUtils {
     private BlockBreakUtils() {}
 
-    private static final MethodHandle CONSTRUCTOR;
-    static {
-        final String[] immutableNames, immutableDescriptors;
-        try {
-            BlockBreakUtils blockBreakUtilsEmptyImpl = Constant.factory.ofEmptyAbstractImplInstance(
-                    MethodHandles.lookup(),
-                    BlockBreakUtils.class
-            );
-            final String[][] immutableNamesAndDescriptors = JavaHelper.getNamesAndDescriptors(
-                    MethodHandles.lookup(),
-                    (Supplier<DynamicConstant<Boolean>> & Serializable) blockBreakUtilsEmptyImpl::breaking
-            );
-            immutableNames = immutableNamesAndDescriptors[0];
-            immutableDescriptors = immutableNamesAndDescriptors[1];
-        } catch (Throwable t) {
-            throw new RuntimeException(t);
-        }
-        CONSTRUCTOR = Constant.factory.ofRecordConstructor(
-                MethodHandles.lookup(),
-                BlockBreakUtils.class,
-                false,
-                immutableNames,
-                immutableDescriptors,
-                null,
-                null,
-                true,
-                false
-        );
-    }
-
     public static BlockBreakUtils createInstance() {
-        try {
-            return (BlockBreakUtils) CONSTRUCTOR.invokeExact(
-                    Constant.factory.ofMutable(Boolean.FALSE)
-            );
-        } catch (Throwable e) {
-            throw new RuntimeException(e);
-        }
+        return new BlockBreakUtils();
     }
 
-    abstract DynamicConstant<Boolean> breaking();
+    private boolean breaking = false;
 
     public boolean isModBreakingBlock() {
-        return breaking().orElseThrow();
+        if (!BlockMinerMod.getInstance().getTaskManager().isEnabled()) {
+            return false;
+        }
+        return breaking;
     }
 
     public void setBreaking(boolean breaking) {
-        breaking().set(breaking);
+        this.breaking = breaking;
     }
 }

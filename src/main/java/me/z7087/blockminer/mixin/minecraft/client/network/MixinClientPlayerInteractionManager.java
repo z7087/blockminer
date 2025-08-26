@@ -11,6 +11,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class MixinClientPlayerInteractionManager {
     @Inject(method = "tick", at = @At(value = "RETURN"))
     private void onTick(CallbackInfo ci) {
+        BlockMinerMod.getInstance().stableConstants().update();
+        BlockMinerMod.getInstance().ticklyUpdateConstants().tick(BlockMinerMod.getInstance().stableConstants().mc());
         BlockMinerMod.getInstance().getTaskManager().tick();
     }
 }
