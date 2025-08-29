@@ -38,7 +38,7 @@ public class PlayerUtils {
             );
             //#else
             //$$ // damn nullable?
-            //$$ Objects.requireNonNull(originInput).sneaking = true;
+            //$$ java.util.Objects.requireNonNull(originInput).sneaking = true;
             //#endif
 
             if (
