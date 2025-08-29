@@ -86,6 +86,18 @@ public interface ClientPlayerEntityAccessor {
     @Accessor
     void setTicksSinceLastPositionPacketSent(int ticksSinceLastPositionPacketSent);
 
+    //#if MC <= 12105
+    @Accessor
+    boolean getLastSneaking();
+    @Accessor
+    void setLastSneaking(boolean lastSneaking);
+    //#else
+    //$$ @Accessor
+    //$$ net.minecraft.util.PlayerInput getLastPlayerInput();
+    //$$ @Accessor
+    //$$ void setLastPlayerInput(net.minecraft.util.PlayerInput lastPlayerInput);
+    //#endif
+
     @Invoker
     void invokeSendMovementPackets();
 }

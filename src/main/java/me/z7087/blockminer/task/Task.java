@@ -4,6 +4,7 @@ import me.z7087.blockminer.BlockMinerMod;
 import me.z7087.blockminer.mixin.minecraft.client.network.ClientPlayerInteractionManagerAccessor;
 import me.z7087.blockminer.util.BlockUtils;
 import me.z7087.blockminer.util.InventoryUtils;
+import me.z7087.blockminer.util.PlayerUtils;
 import me.z7087.blockminer.util.RotationUtils;
 import me.z7087.blockminer.util.data.BlockBreakStructureFull;
 import me.z7087.blockminer.util.enums.PowerBlockType;
@@ -353,17 +354,19 @@ public class Task implements Comparable<Task> {
         if (redstoneTorchIndex != -1 && structure.getPowerBlockType().isRedstoneTorch()) {
             leverIndex = -1;
             // 放在那个方块上
-            ActionResult result = InventoryUtils.moveToOffHandDuring(player,
-                    redstoneTorchIndex,
-                    () -> BlockUtils.interactBlock(interactionManager,
-                            player,
-                            world,
-                            Hand.OFF_HAND,
-                            new BlockHitResult(
-                                    Vec3d.of(structure.getDependBlockPos()),
-                                    structure.getPowerBlockFace(),
-                                    structure.getDependBlockPos(),
-                                    false
+            ActionResult result = PlayerUtils.sneakDuring(player,
+                    () -> InventoryUtils.moveToOffHandDuring(player,
+                            redstoneTorchIndex,
+                            () -> BlockUtils.interactBlock(interactionManager,
+                                    player,
+                                    world,
+                                    Hand.OFF_HAND,
+                                    new BlockHitResult(
+                                            Vec3d.of(structure.getDependBlockPos()),
+                                            structure.getPowerBlockFace(),
+                                            structure.getDependBlockPos(),
+                                            false
+                                    )
                             )
                     )
             );
@@ -371,17 +374,19 @@ public class Task implements Comparable<Task> {
         } else if (leverIndex != -1 && structure.getPowerBlockType().isLever()) {
             redstoneTorchIndex = -1;
             // 放在那个方块上
-            ActionResult result = InventoryUtils.moveToOffHandDuring(player,
-                    leverIndex,
-                    () -> BlockUtils.interactBlock(interactionManager,
-                            player,
-                            world,
-                            Hand.OFF_HAND,
-                            new BlockHitResult(
-                                    Vec3d.of(structure.getDependBlockPos()),
-                                    structure.getPowerBlockFace(),
-                                    structure.getDependBlockPos(),
-                                    false
+            ActionResult result = PlayerUtils.sneakDuring(player,
+                    () -> InventoryUtils.moveToOffHandDuring(player,
+                            leverIndex,
+                            () -> BlockUtils.interactBlock(interactionManager,
+                                    player,
+                                    world,
+                                    Hand.OFF_HAND,
+                                    new BlockHitResult(
+                                            Vec3d.of(structure.getDependBlockPos()),
+                                            structure.getPowerBlockFace(),
+                                            structure.getDependBlockPos(),
+                                            false
+                                    )
                             )
                     )
             );
@@ -611,17 +616,19 @@ public class Task implements Comparable<Task> {
             ActionResult result;
             if (redstoneTorchIndex != -1) {
                 // 重新放置红石火把
-                result = InventoryUtils.moveToOffHandDuring(player,
-                        redstoneTorchIndex,
-                        () -> BlockUtils.interactBlock(interactionManager,
-                                player,
-                                world,
-                                Hand.OFF_HAND,
-                                new BlockHitResult(
-                                        Vec3d.of(structure.getDependBlockPos()),
-                                        structure.getPowerBlockFace(),
-                                        structure.getDependBlockPos(),
-                                        false
+                result = PlayerUtils.sneakDuring(player,
+                        () -> InventoryUtils.moveToOffHandDuring(player,
+                                redstoneTorchIndex,
+                                () -> BlockUtils.interactBlock(interactionManager,
+                                        player,
+                                        world,
+                                        Hand.OFF_HAND,
+                                        new BlockHitResult(
+                                                Vec3d.of(structure.getDependBlockPos()),
+                                                structure.getPowerBlockFace(),
+                                                structure.getDependBlockPos(),
+                                                false
+                                        )
                                 )
                         )
                 );
