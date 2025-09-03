@@ -12,7 +12,6 @@
     "sources": "https://github.com/z7087/blockminer"
   },
   "license": "GPL-3.0",
-  "icon": "assets/blockminer/icon.png",
   "environment": "client",
   "entrypoints": {
     "client": [
