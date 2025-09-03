@@ -1,19 +1,24 @@
 package me.z7087.blockminer.task;
 
+import it.unimi.dsi.fastutil.longs.LongListIterator;
 import me.z7087.blockminer.BlockMinerMod;
 import me.z7087.blockminer.I18n;
-import me.z7087.blockminer.util.BlinkUtils;
-import me.z7087.blockminer.util.MessageUtils;
+import me.z7087.blockminer.mixin.minecraft.client.network.ClientPlayerInteractionManagerAccessor;
+import me.z7087.blockminer.util.*;
+import me.z7087.blockminer.util.data.PositionStorage;
 import me.z7087.blockminer.util.enums.TaskState;
 import me.z7087.final2constant.Constant;
 import me.z7087.final2constant.DynamicConstant;
 import me.z7087.final2constant.util.JavaHelper;
-import net.minecraft.block.Block;
+import net.minecraft.block.*;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
+import net.minecraft.client.network.ClientPlayerInteractionManager;
 import net.minecraft.client.world.ClientWorld;
+import net.minecraft.item.ItemStack;
 import net.minecraft.network.ClientConnection;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
 
 import java.io.Serializable;
 import java.lang.invoke.MethodHandle;
@@ -48,7 +53,8 @@ public abstract class TaskManager {
                     (Supplier<DynamicConstant<Boolean>> & Serializable) taskManagerEmptyImpl::enabled,
                     (Supplier<DynamicConstant<WeakReference<ClientWorld>>> & Serializable) taskManagerEmptyImpl::prevWorldRef,
                     (Supplier<Set<BlockPos>> & Serializable) taskManagerEmptyImpl::posSet,
-                    (Supplier<LinkedList<Task>> & Serializable) taskManagerEmptyImpl::taskQueue
+                    (Supplier<LinkedList<Task>> & Serializable) taskManagerEmptyImpl::taskQueue,
+                    (Supplier<PositionStorage> & Serializable) taskManagerEmptyImpl::positionsToClear
             );
             immutableNames = immutableNamesAndDescriptors[0];
             immutableDescriptors = immutableNamesAndDescriptors[1];
@@ -73,12 +79,14 @@ public abstract class TaskManager {
         final DynamicConstant<WeakReference<ClientWorld>> prevWorldRef = Constant.factory.ofMutable(null);
         final Set<BlockPos> posSet = new HashSet<>();
         final LinkedList<Task> taskQueue = new LinkedList<>();
+        final PositionStorage positionsToClear = PositionStorage.createInstance();
         try {
             return (TaskManager) CONSTRUCTOR.invokeExact(
                     enabled,
                     prevWorldRef,
                     posSet,
-                    taskQueue
+                    taskQueue,
+                    positionsToClear
             );
         } catch (Throwable e) {
             throw new RuntimeException(e);
@@ -89,16 +97,17 @@ public abstract class TaskManager {
     abstract DynamicConstant<WeakReference<ClientWorld>> prevWorldRef();
     abstract Set<BlockPos> posSet();
     abstract LinkedList<Task> taskQueue();
+    abstract PositionStorage positionsToClear();
 
     public void tick() {
         BlockMinerMod.getInstance().getRotationUtils().resetRotationIfNoKeepRotation();
         if (!isEnabled())
             return;
-        final ClientPlayerEntity player = MinecraftClient.getInstance().player;
+        final ClientPlayerEntity player = BlockMinerMod.getInstance().ticklyUpdateConstants().player();
         if (player == null) {
             return;
         }
-        final ClientWorld world = MinecraftClient.getInstance().world;
+        final ClientWorld world = BlockMinerMod.getInstance().ticklyUpdateConstants().world();
         if (world == null) {
             this.setPrevWorldRef(null);
             onDisable();
@@ -112,6 +121,7 @@ public abstract class TaskManager {
             }
         }
         final ClientConnection connection = player.networkHandler.getConnection();
+        final PositionStorage positionsToClear = positionsToClear();
         final boolean startedBlinking = connection != null
                 && BlockMinerMod.getInstance().getConfig().isBlinkDuringTasksTick()
                 && !taskQueue().isEmpty()
@@ -120,13 +130,43 @@ public abstract class TaskManager {
             final Iterator<Task> taskIterator = taskQueue().iterator();
             while (taskIterator.hasNext()) {
                 final Task task = taskIterator.next();
-                final boolean ignoreOtherTasks = task.tick();
+                final boolean ignoreOtherTasks = task.tick(positionsToClear);
                 if (task.state == TaskState.Finished) {
                     taskIterator.remove();
                     posSet().remove(task.targetPos);
                 }
                 if (ignoreOtherTasks)
                     break;
+            }
+            if (!BlockMinerMod.getInstance().getBlockBreakUtils().isModBreakingBlock()) {
+                final ClientPlayerInteractionManager interactionManager = BlockMinerMod.getInstance().ticklyUpdateConstants().interactionManager();
+                final ItemStack mainHandStack = player.getMainHandStack();
+                final LongListIterator positionsToClearIterator = positionsToClear.iterator();
+                while (positionsToClearIterator.hasNext()) {
+                    final BlockPos pos = BlockPos.fromLong(positionsToClearIterator.nextLong());
+                    if (BlockUtils.playerCanTouchServerside(player, pos, 1.0, true)) {
+                        final BlockState state = world.getBlockState(pos);
+                        final float blockBreakingDelta = InventoryUtils.calcBlockBreakingDelta(player, state, mainHandStack);
+                        if (blockBreakingDelta >= 1) {
+                            interactionManager.cancelBlockBreaking();
+                            interactionManager.attackBlock(pos, Direction.DOWN);
+                            positionsToClearIterator.remove();
+                        } else if (blockBreakingDelta >= 0.7) {
+                            interactionManager.cancelBlockBreaking();
+                            interactionManager.attackBlock(pos, Direction.DOWN);
+                            ClientPlayerInteractionManagerAccessor interactionManagerAccessor = (ClientPlayerInteractionManagerAccessor) interactionManager;
+                            while (interactionManager.isBreakingBlock() && interactionManagerAccessor.invokeIsCurrentlyBreaking(pos))
+                                interactionManager.updateBlockBreakingProgress(pos, Direction.DOWN);
+                            positionsToClearIterator.remove();
+                        } else {
+                            final Block block = state.getBlock();
+                            // 不可秒破且不是活塞或移动中的方块，可能是后加的什么东西，不管了
+                            if (!(block instanceof PistonBlock || block instanceof PistonExtensionBlock)) {
+                                positionsToClearIterator.remove();
+                            }
+                        }
+                    }
+                }
             }
         } finally {
             if (startedBlinking) {
@@ -215,6 +255,7 @@ public abstract class TaskManager {
         this.setEnabled(false);
         //this.prevWorldRef = null;
         clearTasks();
+        positionsToClear().clear();
         BlockMinerMod.getInstance().getRotationUtils().forceClearRotations();
         BlockMinerMod.getInstance().getBlockBreakUtils().setBreaking(false);
     }

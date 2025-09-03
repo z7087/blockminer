@@ -61,6 +61,12 @@ loom {
     def commonVmArgs = ['-Dmixin.debug.export=true', '-Dmixin.debug.countInjections=true']
     commonVmArgs += '-XX:+UnlockExperimentalVMOptions'
     commonVmArgs += '-XX:+TrustFinalNonStaticFields'
+    def constantFoldTest = false
+    if (constantFoldTest) {
+        commonVmArgs += '-XX:+UnlockDiagnosticVMOptions'
+        commonVmArgs += '-XX:CompileCommand=print me.z7087.blockminer.BlockMinerMod::getInstance'
+        commonVmArgs += '-XX:CompileCommand=option me.z7087.blockminer.BlockMinerMod::getInstance,PrintCompilation'
+    }
     if (JAVA_COMPATIBILITY.isCompatibleWith(JavaVersion.VERSION_15)) {
         //commonVmArgs += '-XX:+UseZGC'
         //if (JAVA_COMPATIBILITY.isCompatibleWith(JavaVersion.VERSION_21))

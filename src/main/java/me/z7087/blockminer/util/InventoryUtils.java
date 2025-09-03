@@ -213,8 +213,12 @@ public final class InventoryUtils {
         //$$ }
         //#endif
         float hardness = BlockUtils.getHardness(blockState);
-        if (hardness < 0)
+        if (hardness <= 0) {
+            if (hardness == 0) {
+                return 1;
+            }
             return 0;
+        }
         final int i;
         if (!blockState.isToolRequired() || itemStack.isSuitableFor(blockState)) {
             i = 30;

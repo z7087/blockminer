@@ -8,6 +8,8 @@ public enum TaskState {
     SelectPickaxeAndReadyMine,
     WaitForPistonExtend(true),
     Execute,
+    WaitForPistonClear(true),
+    ClearPiston,
     Finished;
 
     private final boolean waiting;

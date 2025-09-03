@@ -7,6 +7,7 @@ import me.z7087.blockminer.util.InventoryUtils;
 import me.z7087.blockminer.util.PlayerUtils;
 import me.z7087.blockminer.util.RotationUtils;
 import me.z7087.blockminer.util.data.BlockBreakStructureFull;
+import me.z7087.blockminer.util.data.PositionStorage;
 import me.z7087.blockminer.util.enums.PowerBlockType;
 import me.z7087.blockminer.util.enums.TaskState;
 import me.z7087.blockminer.util.finder.BlockFinder;
@@ -18,6 +19,7 @@ import net.minecraft.client.world.ClientWorld;
 import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
+import net.minecraft.state.property.Properties;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
 import net.minecraft.util.hit.BlockHitResult;
@@ -47,6 +49,13 @@ public class Task implements Comparable<Task> {
         return --waitTicks;
     }
 
+    private void stopWaiting() {
+        if (this.waitTicks == 0) {
+            throw new IllegalStateException("not waiting");
+        }
+        waitTicks = 0;
+    }
+
     private void setWaitTicks(int ticks) {
         if (this.waitTicks > 0) {
             throw new IllegalStateException("still waiting");
@@ -54,7 +63,7 @@ public class Task implements Comparable<Task> {
         this.waitTicks = ticks + BlockMinerMod.getInstance().getConfig().getPingSpikeThreshold();
     }
 
-    public boolean tick() {
+    public boolean tick(PositionStorage positionsToClear) {
         //noinspection resource
         if (BlockMinerMod.getInstance().ticklyUpdateConstants().player() == null
                 || BlockMinerMod.getInstance().ticklyUpdateConstants().world() == null) {
@@ -65,7 +74,7 @@ public class Task implements Comparable<Task> {
         while (true) {
             switch (state) {
                 case Start: {
-                    if (start()) {
+                    if (start(positionsToClear)) {
                         continue;
                     }
                     break loop;
@@ -100,7 +109,17 @@ public class Task implements Comparable<Task> {
                     break loop;
                 }
                 case Execute: {
-                    execute();
+                    execute(positionsToClear);
+                    break loop;
+                }
+                case WaitForPistonClear: {
+                    if (waitForPistonClear()) {
+                        continue;
+                    }
+                    break loop;
+                }
+                case ClearPiston: {
+                    clearPiston(positionsToClear);
                     break loop;
                 }
                 case Finished:
@@ -112,7 +131,7 @@ public class Task implements Comparable<Task> {
         return false;
     }
 
-    private boolean start() {
+    private boolean start(PositionStorage positionsToClear) {
         final ClientWorld world;
         final ClientPlayerEntity player;
         final PlayerInventory inventory;
@@ -163,13 +182,16 @@ public class Task implements Comparable<Task> {
         if (powerBlockUsage == null)
             return false;
         for (BlockBreakStructureFull structure : (Iterable<? extends BlockBreakStructureFull>) BlockMinerMod.getInstance().getConfig().getSearchMode().findPossibleStructures(world, targetPos, powerBlockUsage, dependBlockIndex != -1)::iterator) {
-            this.structure = structure;
             if (BlockUtils.playerCanTouchServerside(player, structure.getPistonPos(), 1, false)
                     && BlockUtils.playerCanTouchServerside(player, structure.getPowerBlockPos(), 1, false)
                     && BlockUtils.playerCanTouchServerside(player, structure.getDependBlockPos(), 1, false)
                     && world.canPlace(Blocks.STONE.getDefaultState(), structure.getPistonPos(), ShapeContext.absent())
                     // 当依赖方块是目标方块时，无法创建无头活塞
-                    && (!BlockMinerMod.getInstance().getConfig().isHeadlessPistonMode() || !structure.getDependBlockPos().equals(targetPos))) {
+                    && (!BlockMinerMod.getInstance().getConfig().isHeadlessPistonMode() || !structure.getDependBlockPos().equals(targetPos))
+                    // 保证依赖方块不会被其他task意外清除
+                    && !positionsToClear.hasPos(structure.getDependBlockPos())
+            ) {
+                this.structure = structure;
                 // 朝上下的活塞的朝向可以立即到位，其他方向的不行
                 switch (structure.getPistonFace()) {
                     case UP:
@@ -524,7 +546,7 @@ public class Task implements Comparable<Task> {
         return true;
     }
 
-    private void execute() {
+    private void execute(PositionStorage positionsToClear) {
         final ClientWorld world;
         final ClientPlayerEntity player;
         final PlayerInventory inventory;
@@ -679,10 +701,121 @@ public class Task implements Comparable<Task> {
             retry();
             return;
         }
-        state = TaskState.Finished;
+        if (!BlockMinerMod.getInstance().getConfig().isHeadlessPistonMode()) {
+            // 检查dependBlockPos处的方块是否硬度==0 并且确保没有方块依附在dependBlockPos处
+            dependBlockClearCheck: {
+                final BlockPos dependBlockPos = structure.getDependBlockPos();
+                final BlockState dependBlockState = world.getBlockState(dependBlockPos);
+                if (BlockUtils.getHardness(dependBlockState) != 0)
+                    break dependBlockClearCheck;
+                // 如果已经是空气，不需要清除，但真的会是空气吗？
+                if (dependBlockState.isAir())
+                    break dependBlockClearCheck;
+                for (Direction direction : BlockFinder.DIRECTIONS) {
+                    final BlockPos dependBlockNearPos = dependBlockPos.offset(direction);
+                    if (world.isInBuildLimit(dependBlockNearPos)) {
+                        final BlockState dependBlockNearPosState = world.getBlockState(dependBlockNearPos);
+                        final Block dependBlockNearPosBlock = dependBlockNearPosState.getBlock();
+                        if (dependBlockNearPosBlock instanceof RedstoneTorchBlock) {
+                            Direction redstoneTorchFace;
+                            if (dependBlockNearPosBlock instanceof WallRedstoneTorchBlock) {
+                                redstoneTorchFace = dependBlockNearPosState.get(WallRedstoneTorchBlock.FACING);
+                            } else {
+                                redstoneTorchFace = Direction.UP;
+                            }
+                            if (redstoneTorchFace == direction)
+                                break dependBlockClearCheck;
+                        } else if (dependBlockNearPosBlock instanceof LeverBlock) {
+                            Direction leverFace;
+                            switch (dependBlockNearPosState.get(net.minecraft.state.property.Properties.BLOCK_FACE)) {
+                                case CEILING: {
+                                    leverFace = Direction.DOWN;
+                                    break;
+                                }
+                                case FLOOR: {
+                                    leverFace = Direction.UP;
+                                    break;
+                                }
+                                default: {
+                                    leverFace = dependBlockNearPosState.get(Properties.FACING);
+                                    break;
+                                }
+                            }
+                            if (leverFace == direction)
+                                break dependBlockClearCheck;
+                        }
+                    }
+                }
+
+                positionsToClear.registerPos(dependBlockPos);
+            }
+            // 由于活塞需要等到服务端运行下一tick破掉目标方块，等待
+            state = TaskState.WaitForPistonClear;
+            setWaitTicks(8); // TODO 不清楚活塞几tick能到位 后面再改？
+        } else {
+            // 无头活塞模式，不需要事后清理
+            state = TaskState.Finished;
+        }
     }
 
+    private boolean waitForPistonClear() {
+        final ClientWorld world;
+        final PlayerInventory inventory;
+        final ClientPlayerInteractionManager interactionManager;
+        {
+            BlockMinerMod.TicklyUpdateConstants ticklyUpdateConstants = BlockMinerMod.getInstance().ticklyUpdateConstants();
+            //noinspection resource
+            world = ticklyUpdateConstants.world();
+            inventory = ticklyUpdateConstants.inventory();
+            interactionManager = ticklyUpdateConstants.interactionManager();
+        }
+        if (getWaitTicksAfterDecrement() > 0) {
+            if (pickaxeIndex != -1) {
+                InventoryUtils.setSelectedSlot(inventory, pickaxeIndex);
+                ((ClientPlayerInteractionManagerAccessor) interactionManager).invokeSyncSelectedSlot();
+            }
+            final BlockState pistonPosState = world.getBlockState(structure.getPistonPos());
+            final Block pistonPosBlock = pistonPosState.getBlock();
+            if (pistonPosBlock instanceof PistonBlock) {
+                // 如果活塞不朝向目标方块 说明完成了计划刻继承
+                if (pistonPosState.get(Properties.FACING) != structure.getPistonOffset().getOpposite()) {
+                    stopWaiting();
+                    state = TaskState.ClearPiston;
+                    return true;
+                }
+            } else if (!(pistonPosBlock instanceof PistonExtensionBlock)) {
+                // 活塞所在的位置被其他方块替代了，放弃清理活塞
+                stopWaiting();
+                state = TaskState.Finished;
+            }
+            return false;
+        }
+        final BlockState pistonPosState = world.getBlockState(structure.getPistonPos());
+        if (pistonPosState.getBlock() instanceof PistonBlock && pistonPosState.get(Properties.FACING) != structure.getPistonOffset().getOpposite()) {
+            // 如果活塞不朝向目标方块 说明完成了计划刻继承
+            state = TaskState.ClearPiston;
+            return true;
+        } else {
+            // 这么久还没破掉？放弃清理活塞
+            state = TaskState.Finished;
+            return false;
+        }
+    }
 
+    private void clearPiston(PositionStorage positionStorage) {
+        final ClientWorld world;
+        {
+            BlockMinerMod.TicklyUpdateConstants ticklyUpdateConstants = BlockMinerMod.getInstance().ticklyUpdateConstants();
+            //noinspection resource
+            world = ticklyUpdateConstants.world();
+        }
+        final BlockPos pistonPos = structure.getPistonPos();
+        final BlockState pistonPosState = world.getBlockState(pistonPos);
+        if (pistonPosState.getBlock() instanceof PistonBlock && pistonPosState.get(Properties.FACING) != structure.getPistonOffset().getOpposite()) {
+            positionStorage.registerPos(pistonPos);
+        }
+        state = TaskState.Finished;
+    }
 
 
 
