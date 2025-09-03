@@ -701,7 +701,7 @@ public class Task implements Comparable<Task> {
             retry();
             return;
         }
-        if (!BlockMinerMod.getInstance().getConfig().isHeadlessPistonMode()) {
+        if (!BlockMinerMod.getInstance().getConfig().isHeadlessPistonMode() && BlockMinerMod.getInstance().getConfig().isAutoClearAfterTask()) {
             // 检查dependBlockPos处的方块是否硬度==0 并且确保没有方块依附在dependBlockPos处
             dependBlockClearCheck: {
                 final BlockPos dependBlockPos = structure.getDependBlockPos();
@@ -753,7 +753,7 @@ public class Task implements Comparable<Task> {
             state = TaskState.WaitForPistonClear;
             setWaitTicks(8); // TODO 不清楚活塞几tick能到位 后面再改？
         } else {
-            // 无头活塞模式，不需要事后清理
+            // 无头活塞模式或不事后清理模式，不需要事后清理
             state = TaskState.Finished;
         }
     }

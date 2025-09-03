@@ -50,6 +50,7 @@ public abstract class Config {
                     (Supplier<DynamicConstant<Boolean>> & Serializable) configEmptyImpl::debug,
                     (Supplier<DynamicConstant<Boolean>> & Serializable) configEmptyImpl::headlessPistonMode,
                     (Supplier<DynamicConstant<Boolean>> & Serializable) configEmptyImpl::blinkDuringTasksTick,
+                    (Supplier<DynamicConstant<Boolean>> & Serializable) configEmptyImpl::autoClearAfterTask,
                     (Supplier<DynamicConstant<Integer>> & Serializable) configEmptyImpl::pingSpikeThreshold,
                     (Supplier<DynamicConstant<PowerBlockType>> & Serializable) configEmptyImpl::powerBlockUsage,
                     (Supplier<DynamicConstant<DistanceCalculationMode>> & Serializable) configEmptyImpl::distanceCalculationMode,
@@ -80,6 +81,7 @@ public abstract class Config {
         final DynamicConstant<Boolean> debug = Constant.factory.ofMutable(false);
         final DynamicConstant<Boolean> headlessPistonMode = Constant.factory.ofMutable(false);
         final DynamicConstant<Boolean> blinkDuringTasksTick = Constant.factory.ofMutable(false);
+        final DynamicConstant<Boolean> autoClearAfterTask = Constant.factory.ofMutable(true);
         final DynamicConstant<Integer> pingSpikeThreshold = Constant.factory.ofMutable(0);
         final DynamicConstant<PowerBlockType> powerBlockUsage = Constant.factory.ofMutable(PowerBlockType.Both);
         final DynamicConstant<DistanceCalculationMode> distanceCalculationMode = Constant.factory.ofMutable(DistanceCalculationMode.currentClientVersion);
@@ -93,6 +95,7 @@ public abstract class Config {
                     debug,
                     headlessPistonMode,
                     blinkDuringTasksTick,
+                    autoClearAfterTask,
                     pingSpikeThreshold,
                     powerBlockUsage,
                     distanceCalculationMode,
@@ -109,6 +112,7 @@ public abstract class Config {
     abstract DynamicConstant<Boolean> debug();
     abstract DynamicConstant<Boolean> headlessPistonMode();
     abstract DynamicConstant<Boolean> blinkDuringTasksTick();
+    abstract DynamicConstant<Boolean> autoClearAfterTask();
     abstract DynamicConstant<Integer> pingSpikeThreshold();
     abstract DynamicConstant<PowerBlockType> powerBlockUsage();
     abstract DynamicConstant<DistanceCalculationMode> distanceCalculationMode();
@@ -258,6 +262,15 @@ public abstract class Config {
         blinkDuringTasksTick().sync();
     }
 
+    public boolean isAutoClearAfterTask() {
+        return autoClearAfterTask().orElseThrow();
+    }
+
+    public void setAutoClearAfterTask(boolean value) {
+        autoClearAfterTask().set(value);
+        autoClearAfterTask().sync();
+    }
+
     public int getPingSpikeThreshold() {
         return pingSpikeThreshold().orElseThrow();
     }
@@ -301,6 +314,7 @@ public abstract class Config {
             out.name("debug").value(config.isDebug());
             out.name("headless-piston-mode").value(config.isHeadlessPistonMode());
             out.name("blink-during-tasks-tick").value(config.isBlinkDuringTasksTick());
+            out.name("auto-clear-after-task").value(config.isAutoClearAfterTask());
             out.name("ping-spike-threshold").value(config.getPingSpikeThreshold());
             out.name("power-block-usage").value(config.getPowerBlockUsage().toString());
             out.name("distance-calculation-mode").value(config.getDistanceCalculationMode().toString());
@@ -347,6 +361,10 @@ public abstract class Config {
                         }
                         case "blink-during-tasks-tick": {
                             config.setBlinkDuringTasksTick(in.nextBoolean());
+                            break;
+                        }
+                        case "auto-clear-after-task": {
+                            config.setAutoClearAfterTask(in.nextBoolean());
                             break;
                         }
                         case "ping-spike-threshold": {

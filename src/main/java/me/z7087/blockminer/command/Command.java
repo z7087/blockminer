@@ -136,7 +136,26 @@ public final class Command {
                                                 return 1;
                                             }
                                             context.getSource().sendFeedback(Text.of("blink-during-tasks-tick already set to " + input));
-                                            return 0;//blinkDuringTasksTick
+                                            return 0;
+                                        })
+                        )
+                ).then(literal("auto-clear-after-task")
+                        .executes((context) -> {
+                            context.getSource().sendFeedback(Text.of(String.valueOf(BlockMinerMod.getInstance().getConfig().isAutoClearAfterTask())));
+                            return 1;
+                        })
+                        .then(
+                                argument("bool", BoolArgumentType.bool())
+                                        .executes(context -> {
+                                            Config config = BlockMinerMod.getInstance().getConfig();
+                                            boolean input = BoolArgumentType.getBool(context, "bool");
+                                            if (config.isAutoClearAfterTask() != input) {
+                                                config.setAutoClearAfterTask(input);
+                                                BlockMinerMod.getInstance().tryToSaveConfig();
+                                                return 1;
+                                            }
+                                            context.getSource().sendFeedback(Text.of("auto-clear-after-task already set to " + input));
+                                            return 0;
                                         })
                         )
                 ).then(literal("ping-spike-threshold")

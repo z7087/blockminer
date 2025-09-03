@@ -138,7 +138,7 @@ public abstract class TaskManager {
                 if (ignoreOtherTasks)
                     break;
             }
-            if (!BlockMinerMod.getInstance().getBlockBreakUtils().isModBreakingBlock()) {
+            if (!BlockMinerMod.getInstance().getBlockBreakUtils().isModBreakingBlock() && BlockMinerMod.getInstance().getConfig().isAutoClearAfterTask()) {
                 final ClientPlayerInteractionManager interactionManager = BlockMinerMod.getInstance().ticklyUpdateConstants().interactionManager();
                 final ItemStack mainHandStack = player.getMainHandStack();
                 final LongListIterator positionsToClearIterator = positionsToClear.iterator();
