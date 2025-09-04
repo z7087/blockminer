@@ -148,8 +148,10 @@ public abstract class TaskManager {
                         final BlockState state = world.getBlockState(pos);
                         final float blockBreakingDelta = InventoryUtils.calcBlockBreakingDelta(player, state, mainHandStack);
                         if (blockBreakingDelta >= 1) {
-                            interactionManager.cancelBlockBreaking();
-                            interactionManager.attackBlock(pos, Direction.DOWN);
+                            if (!state.isAir()) {
+                                interactionManager.cancelBlockBreaking();
+                                interactionManager.attackBlock(pos, Direction.DOWN);
+                            }
                             positionsToClearIterator.remove();
                         } else if (blockBreakingDelta >= 0.7) {
                             interactionManager.cancelBlockBreaking();
