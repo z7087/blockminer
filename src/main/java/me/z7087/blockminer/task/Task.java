@@ -711,6 +711,8 @@ public class Task implements Comparable<Task> {
                 // 如果已经是空气，不需要清除，但真的会是空气吗？
                 if (dependBlockState.isAir())
                     break dependBlockClearCheck;
+                if (!BlockMinerMod.getInstance().getConfig().dependBlockWhitelistContains(dependBlockState.getBlock()))
+                    break dependBlockClearCheck;
                 for (Direction direction : BlockFinder.DIRECTIONS) {
                     final BlockPos dependBlockNearPos = dependBlockPos.offset(direction);
                     if (world.isInBuildLimit(dependBlockNearPos)) {
