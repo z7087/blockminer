@@ -75,7 +75,7 @@ public abstract class TaskManager {
     }
 
     public static TaskManager createInstance() {
-        final DynamicConstant<Boolean> enabled = Constant.factory.ofMutable(Boolean.FALSE);
+        final DynamicConstant<Boolean> enabled = Constant.factory.ofVolatile(Boolean.FALSE);
         final DynamicConstant<WeakReference<ClientWorld>> prevWorldRef = Constant.factory.ofMutable(null);
         final Set<BlockPos> posSet = new HashSet<>();
         final LinkedList<Task> taskQueue = new LinkedList<>();
@@ -182,12 +182,7 @@ public abstract class TaskManager {
         final ClientWorld world = Objects.requireNonNull(MinecraftClient.getInstance().world);
         if (!BlockMinerMod.getInstance().getConfig().blockWhitelist().contains(world.getBlockState(blockPos).getBlock()))
             return false;
-        if (posSet().contains(blockPos))
-            return false;
-        final Task task = Task.of(blockPos);
-        posSet().add(blockPos);
-        taskQueue().add(task);
-        return true;
+        return addTask(blockPos);
     }
     public boolean handleUseOnBlock(BlockPos targetBlock) {
         final ClientWorld world = Objects.requireNonNull(MinecraftClient.getInstance().world);
@@ -196,23 +191,34 @@ public abstract class TaskManager {
         toggle();
         return true;
     }
+    public boolean addTask(BlockPos pos) {
+        if (posSet().contains(pos))
+            return false;
+        addTask0(pos);
+        return true;
+    }
+    private void addTask0(BlockPos pos) {
+        final Task task = Task.of(pos);
+        posSet().add(pos);
+        taskQueue().add(task);
+    }
 
     public boolean addAura(BlockPos start, BlockPos end) {
+        return addAura(start, end, true);
+    }
+
+    public boolean addAura(BlockPos start, BlockPos end, boolean checkWhitelist) {
         final Set<Block> whitelist = BlockMinerMod.getInstance().getConfig().blockWhitelist();
         ClientWorld world = Objects.requireNonNull(MinecraftClient.getInstance().world);
         Iterator<BlockPos> iterator = BlockPos.iterate(start, end).iterator();
         while (iterator.hasNext()) {
             BlockPos pos = iterator.next();
-            if (world.isInBuildLimit(pos) && !posSet().contains(pos) && whitelist.contains(world.getBlockState(pos).getBlock())) {
-                pos = pos.toImmutable();
-                posSet().add(pos);
-                taskQueue().add(Task.of(pos));
+            if (world.isInBuildLimit(pos) && !posSet().contains(pos) && (!checkWhitelist || whitelist.contains(world.getBlockState(pos).getBlock()))) {
+                addTask0(pos.toImmutable());
                 while (iterator.hasNext()) {
                     pos = iterator.next();
-                    if (world.isInBuildLimit(pos) && !posSet().contains(pos) && whitelist.contains(world.getBlockState(pos).getBlock())) {
-                        pos = pos.toImmutable();
-                        posSet().add(pos);
-                        taskQueue().add(Task.of(pos));
+                    if (world.isInBuildLimit(pos) && !posSet().contains(pos) && (!checkWhitelist || whitelist.contains(world.getBlockState(pos).getBlock()))) {
+                        addTask0(pos.toImmutable());
                     }
                 }
                 return true;
@@ -222,16 +228,25 @@ public abstract class TaskManager {
     }
 
     public void toggle() {
+        toggle(true, true);
+    }
+
+    public void toggle(boolean withToggleMessage, boolean withWarnMultiplayerMessage) {
         if (isEnabled()) {
             onDisable();
-            MessageUtils.printMessage(I18n.TOGGLE_OFF);
+            if (withToggleMessage)
+                MessageUtils.printMessage(I18n.TOGGLE_OFF);
         } else {
             WeakReference<ClientWorld> prevWorldRef = this.getPrevWorldRef();
             onEnable();
-            MessageUtils.printMessage(I18n.TOGGLE_ON);
-            // 每个世界只提醒一次
-            if (!MinecraftClient.getInstance().isInSingleplayer() && prevWorldRef != this.getPrevWorldRef())
-                MessageUtils.printMessage(I18n.WARN_MULTIPLAYER);
+            if (withToggleMessage) {
+                MessageUtils.printMessage(I18n.TOGGLE_ON);
+            }
+            if (withWarnMultiplayerMessage) {
+                // 每个世界只提醒一次
+                if (!MinecraftClient.getInstance().isInSingleplayer() && prevWorldRef != this.getPrevWorldRef())
+                    MessageUtils.printMessage(I18n.WARN_MULTIPLAYER);
+            }
         }
     }
 
@@ -266,8 +281,12 @@ public abstract class TaskManager {
         return enabled().orElseThrow();
     }
 
-    public void setEnabled(boolean value) {
+    private void setEnabled(boolean value) {
         enabled().set(value);
+    }
+
+    public boolean isTaskExists(BlockPos pos) {
+        return posSet().contains(pos);
     }
 
     private WeakReference<ClientWorld> getPrevWorldRef() {
