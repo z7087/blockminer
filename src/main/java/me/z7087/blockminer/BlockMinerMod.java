@@ -6,6 +6,8 @@ import me.z7087.blockminer.task.TaskManager;
 import me.z7087.blockminer.util.BlockBreakUtils;
 import me.z7087.blockminer.util.InventoryUtils;
 import me.z7087.blockminer.util.RotationUtils;
+import me.z7087.blockminer.util.finder.BlockFinder;
+import me.z7087.blockminer.util.finder.SimpleBlockFinder;
 import me.z7087.final2constant.Constant;
 import me.z7087.final2constant.DynamicConstant;
 import me.z7087.final2constant.util.JavaHelper;
@@ -320,6 +322,30 @@ public final class BlockMinerMod implements ClientModInitializer {
         //noinspection ConstantValue
         if (hasFabricCommandApi)
             Command.load();
+        loadClassesBackground();
+    }
+
+    private void loadClassesBackground() {
+        Thread thread = new Thread(() -> {
+            ClassLoader loader = BlockMinerMod.class.getClassLoader();
+            ensureClassInitialized(loader, BlockFinder.StructureFilterCache.class);
+            ensureClassInitialized(loader, SimpleBlockFinder.StructureFilterCache.class);
+        }, "BlockMinerMod Classes Background Loader");
+        thread.setDaemon(true);
+        thread.setPriority(Thread.MIN_PRIORITY);
+        thread.start();
+    }
+
+    private void ensureClassInitialized(ClassLoader loader, Class<?> cls) {
+        try {
+            Class.forName(cls.getName(), true, loader);
+        } catch (ClassNotFoundException e) {
+            LOGGER.error("Class not found during ensureClassInitialized: {}", e.getMessage(), e);
+            throw new RuntimeException(e);
+        } catch (LinkageError e) {
+            LOGGER.error("Class loading failed during ensureClassInitialized: {}", e.getMessage(), e);
+            throw e;
+        }
     }
 
     public void tryToSaveConfig() {
