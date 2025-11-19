@@ -5,9 +5,10 @@ import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonWriter;
 import com.google.gson.stream.MalformedJsonException;
 import me.z7087.blockminer.BlockMinerMod;
-import me.z7087.blockminer.util.enums.DistanceCalculationMode;
-import me.z7087.blockminer.util.enums.PowerBlockType;
-import me.z7087.blockminer.util.enums.SearchMode;
+import me.z7087.blockminer.api.base.BaseConfig;
+import me.z7087.blockminer.api.enums.DistanceCalculationMode;
+import me.z7087.blockminer.api.enums.PowerBlockType;
+import me.z7087.blockminer.api.enums.SearchMode;
 import me.z7087.final2constant.Constant;
 import me.z7087.final2constant.DynamicConstant;
 import me.z7087.final2constant.util.JavaHelper;
@@ -15,7 +16,6 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
 import net.minecraft.item.Item;
-import net.minecraft.item.Items;
 import net.minecraft.registry.Registries;
 import net.minecraft.util.Identifier;
 
@@ -26,12 +26,12 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Supplier;
 
-public abstract class Config {
+public abstract class Config extends BaseConfig {
     public static final File PATH_CONFIG = new File(FabricLoader.getInstance().getConfigDir().toFile(), BlockMinerMod.MOD_ID + ".json");
     public static final Gson GSON;
     static {
         GSON = new GsonBuilder()
-                .registerTypeAdapter(Config.class, new ConfigTypeAdapter())
+                .registerTypeAdapter(BaseConfig.class, new ConfigTypeAdapter())
                 .setPrettyPrinting()
                 .create();
     }
@@ -109,53 +109,6 @@ public abstract class Config {
         }
     }
 
-    abstract DynamicConstant<Boolean> debug();
-    abstract DynamicConstant<Boolean> headlessPistonMode();
-    abstract DynamicConstant<Boolean> blinkDuringTasksTick();
-    abstract DynamicConstant<Boolean> autoClearAfterTask();
-    abstract DynamicConstant<Integer> pingSpikeThreshold();
-    abstract DynamicConstant<PowerBlockType> powerBlockUsage();
-    abstract DynamicConstant<DistanceCalculationMode> distanceCalculationMode();
-    abstract DynamicConstant<SearchMode> searchMode();
-    public abstract Set<Block> blockWhitelist();
-
-    public abstract Set<Block> dependBlockWhitelist();
-    public abstract Set<Item> dependBlockItemWhitelist();
-
-    public String dependBlockWhitelistToString() {
-        return dependBlockWhitelist().toString();
-    }
-
-    public boolean dependBlockWhitelistContains(Block block) {
-        return dependBlockWhitelist().contains(block);
-    }
-
-    public boolean dependBlockWhitelistContains(Item item) {
-        return dependBlockItemWhitelist().contains(item);
-    }
-
-    public boolean dependBlockWhitelistAdd(Block block) {
-        boolean result = dependBlockWhitelist().add(block);
-        if (result) {
-            Item item = block.asItem();
-            if (item != Items.AIR) {
-                dependBlockItemWhitelist().add(item);
-            }
-        }
-        return result;
-    }
-
-    public boolean dependBlockWhitelistRemove(Block block) {
-        boolean result = dependBlockWhitelist().remove(block);
-        if (result) {
-            Item item = block.asItem();
-            if (item != Items.AIR) {
-                dependBlockItemWhitelist().remove(item);
-            }
-        }
-        return result;
-    }
-
     public static Config createDefaultConfig() {
         final Config config = Config.createInstance();
         config.blockWhitelist().addAll(getDefaultBlockWhitelist());
@@ -198,13 +151,13 @@ public abstract class Config {
 
     }
 
-    public static void saveToFile(Config config) throws IOException {
+    public static void saveToFile(BaseConfig config) throws IOException {
         mkdirs();
         Writer writer = null;
         //noinspection TryFinallyCanBeTryWithResources
         try {
             writer = new FileWriter(PATH_CONFIG);
-            GSON.toJson(config, Config.class, writer);
+            GSON.toJson(config, BaseConfig.class, writer);
         } finally {
             if (writer != null) {
                 try {
@@ -235,81 +188,9 @@ public abstract class Config {
         //#endif
     }
 
-    public boolean isDebug() {
-        return debug().orElseThrow();
-    }
-
-    public void setDebug(boolean value) {
-        debug().set(value);
-        debug().sync();
-    }
-
-    public boolean isHeadlessPistonMode() {
-        return headlessPistonMode().orElseThrow();
-    }
-
-    public void setHeadlessPistonMode(boolean value) {
-        headlessPistonMode().set(value);
-        headlessPistonMode().sync();
-    }
-
-    public boolean isBlinkDuringTasksTick() {
-        return blinkDuringTasksTick().orElseThrow();
-    }
-
-    public void setBlinkDuringTasksTick(boolean value) {
-        blinkDuringTasksTick().set(value);
-        blinkDuringTasksTick().sync();
-    }
-
-    public boolean isAutoClearAfterTask() {
-        return autoClearAfterTask().orElseThrow();
-    }
-
-    public void setAutoClearAfterTask(boolean value) {
-        autoClearAfterTask().set(value);
-        autoClearAfterTask().sync();
-    }
-
-    public int getPingSpikeThreshold() {
-        return pingSpikeThreshold().orElseThrow();
-    }
-
-    public void setPingSpikeThreshold(int value) {
-        pingSpikeThreshold().set(value);
-        pingSpikeThreshold().sync();
-    }
-
-    public PowerBlockType getPowerBlockUsage() {
-        return powerBlockUsage().orElseThrow();
-    }
-
-    public void setPowerBlockUsage(PowerBlockType value) {
-        powerBlockUsage().set(value);
-        powerBlockUsage().sync();
-    }
-
-    public DistanceCalculationMode getDistanceCalculationMode() {
-        return distanceCalculationMode().orElseThrow();
-    }
-
-    public void setDistanceCalculationMode(DistanceCalculationMode value) {
-        distanceCalculationMode().set(value);
-        distanceCalculationMode().sync();
-    }
-
-    public SearchMode getSearchMode() {
-        return searchMode().orElseThrow();
-    }
-
-    public void setSearchMode(SearchMode value) {
-        searchMode().set(value);
-        searchMode().sync();
-    }
-
-    private static final class ConfigTypeAdapter extends TypeAdapter<Config> {
+    private static final class ConfigTypeAdapter extends TypeAdapter<BaseConfig> {
         @Override
-        public void write(JsonWriter out, Config config) throws IOException {
+        public void write(JsonWriter out, BaseConfig config) throws IOException {
             out.beginObject();
             out.name("debug").value(config.isDebug());
             out.name("headless-piston-mode").value(config.isHeadlessPistonMode());

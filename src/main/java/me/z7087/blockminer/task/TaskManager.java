@@ -6,7 +6,7 @@ import me.z7087.blockminer.I18n;
 import me.z7087.blockminer.mixin.minecraft.client.network.ClientPlayerInteractionManagerAccessor;
 import me.z7087.blockminer.util.*;
 import me.z7087.blockminer.util.data.PositionStorage;
-import me.z7087.blockminer.util.enums.TaskState;
+import me.z7087.blockminer.api.enums.TaskState;
 import me.z7087.final2constant.Constant;
 import me.z7087.final2constant.DynamicConstant;
 import me.z7087.final2constant.util.JavaHelper;

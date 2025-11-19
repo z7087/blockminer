@@ -1,7 +1,7 @@
 package me.z7087.blockminer.util;
 
 import me.z7087.blockminer.BlockMinerMod;
-import me.z7087.blockminer.util.enums.DistanceCalculationMode;
+import me.z7087.blockminer.api.enums.DistanceCalculationMode;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.client.network.ClientPlayerInteractionManager;

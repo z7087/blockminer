@@ -1,7 +1,7 @@
 package me.z7087.blockminer.api;
 
 import me.z7087.blockminer.BlockMinerMod;
-import me.z7087.blockminer.config.Config;
+import me.z7087.blockminer.api.base.BaseConfig;
 import net.minecraft.util.math.BlockPos;
 
 @SuppressWarnings("unused")
@@ -29,11 +29,11 @@ public final class Apis {
     }
 
 
-    public static Config getConfig() {
+    public static BaseConfig getConfig() {
         return BlockMinerMod.getInstance().getConfig();
     }
 
-    public static void setConfig(Config newConfig) {
+    public static void setConfig(BaseConfig newConfig) {
         BlockMinerMod.getInstance().setConfig(newConfig);
     }
 

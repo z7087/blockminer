@@ -3,7 +3,7 @@
 //import me.z7087.blockminer.util.BlockUtils;
 //import me.z7087.blockminer.util.data.Pair;
 //import me.z7087.blockminer.util.data.PistonPowerInfo;
-//import me.z7087.blockminer.util.enums.PowerBlockType;
+//import me.z7087.blockminer.api.enums.PowerBlockType;
 //import net.minecraft.block.*;
 //import net.minecraft.util.math.BlockPos;
 //import net.minecraft.util.math.Direction;

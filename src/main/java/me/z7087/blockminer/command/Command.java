@@ -5,11 +5,12 @@ import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import me.z7087.blockminer.BlockMinerMod;
+import me.z7087.blockminer.api.base.BaseConfig;
 import me.z7087.blockminer.command.argument.BlockPosArgumentType;
 import me.z7087.blockminer.config.Config;
-import me.z7087.blockminer.util.enums.DistanceCalculationMode;
-import me.z7087.blockminer.util.enums.PowerBlockType;
-import me.z7087.blockminer.util.enums.SearchMode;
+import me.z7087.blockminer.api.enums.DistanceCalculationMode;
+import me.z7087.blockminer.api.enums.PowerBlockType;
+import me.z7087.blockminer.api.enums.SearchMode;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.block.Block;
 import net.minecraft.command.argument.BlockStateArgument;
@@ -90,7 +91,7 @@ public final class Command {
                         .then(
                                 argument("bool", BoolArgumentType.bool())
                                         .executes(context -> {
-                                            Config config = BlockMinerMod.getInstance().getConfig();
+                                            BaseConfig config = BlockMinerMod.getInstance().getConfig();
                                             boolean input = BoolArgumentType.getBool(context, "bool");
                                             if (config.isDebug() != input) {
                                                 config.setDebug(input);
@@ -109,7 +110,7 @@ public final class Command {
                         .then(
                                 argument("bool", BoolArgumentType.bool())
                                         .executes(context -> {
-                                            Config config = BlockMinerMod.getInstance().getConfig();
+                                            BaseConfig config = BlockMinerMod.getInstance().getConfig();
                                             boolean input = BoolArgumentType.getBool(context, "bool");
                                             if (config.isHeadlessPistonMode() != input) {
                                                 config.setHeadlessPistonMode(input);
@@ -128,7 +129,7 @@ public final class Command {
                         .then(
                                 argument("bool", BoolArgumentType.bool())
                                         .executes(context -> {
-                                            Config config = BlockMinerMod.getInstance().getConfig();
+                                            BaseConfig config = BlockMinerMod.getInstance().getConfig();
                                             boolean input = BoolArgumentType.getBool(context, "bool");
                                             if (config.isBlinkDuringTasksTick() != input) {
                                                 config.setBlinkDuringTasksTick(input);
@@ -147,7 +148,7 @@ public final class Command {
                         .then(
                                 argument("bool", BoolArgumentType.bool())
                                         .executes(context -> {
-                                            Config config = BlockMinerMod.getInstance().getConfig();
+                                            BaseConfig config = BlockMinerMod.getInstance().getConfig();
                                             boolean input = BoolArgumentType.getBool(context, "bool");
                                             if (config.isAutoClearAfterTask() != input) {
                                                 config.setAutoClearAfterTask(input);
@@ -166,7 +167,7 @@ public final class Command {
                         .then(
                                 argument("integer", IntegerArgumentType.integer(0, 1200))
                                         .executes(context -> {
-                                            Config config = BlockMinerMod.getInstance().getConfig();
+                                            BaseConfig config = BlockMinerMod.getInstance().getConfig();
                                             int input = IntegerArgumentType.getInteger(context, "integer");
                                             if (config.getPingSpikeThreshold() != input) {
                                                 config.setPingSpikeThreshold(input);
@@ -184,7 +185,7 @@ public final class Command {
                         })
                         .then(literal("redstone-torch")
                                 .executes(context -> {
-                                    Config config = BlockMinerMod.getInstance().getConfig();
+                                    BaseConfig config = BlockMinerMod.getInstance().getConfig();
                                     if (config.getPowerBlockUsage() != PowerBlockType.RedstoneTorch) {
                                         config.setPowerBlockUsage(PowerBlockType.RedstoneTorch);
                                         BlockMinerMod.getInstance().tryToSaveConfig();
@@ -195,7 +196,7 @@ public final class Command {
                                 })
                         ).then(literal("lever")
                                 .executes(context -> {
-                                    Config config = BlockMinerMod.getInstance().getConfig();
+                                    BaseConfig config = BlockMinerMod.getInstance().getConfig();
                                     if (config.getPowerBlockUsage() != PowerBlockType.Lever) {
                                         config.setPowerBlockUsage(PowerBlockType.Lever);
                                         BlockMinerMod.getInstance().tryToSaveConfig();
@@ -206,7 +207,7 @@ public final class Command {
                                 })
                         ).then(literal("both")
                                 .executes(context -> {
-                                    Config config = BlockMinerMod.getInstance().getConfig();
+                                    BaseConfig config = BlockMinerMod.getInstance().getConfig();
                                     if (config.getPowerBlockUsage() != PowerBlockType.Both) {
                                         config.setPowerBlockUsage(PowerBlockType.Both);
                                         BlockMinerMod.getInstance().tryToSaveConfig();
@@ -223,7 +224,7 @@ public final class Command {
                         })
                         .then(literal("old")
                                 .executes(context -> {
-                                    Config config = BlockMinerMod.getInstance().getConfig();
+                                    BaseConfig config = BlockMinerMod.getInstance().getConfig();
                                     if (config.getDistanceCalculationMode() != DistanceCalculationMode.Old) {
                                         config.setDistanceCalculationMode(DistanceCalculationMode.Old);
                                         BlockMinerMod.getInstance().tryToSaveConfig();
@@ -234,7 +235,7 @@ public final class Command {
                                 })
                         ).then(literal("1.19")
                                 .executes(context -> {
-                                    Config config = BlockMinerMod.getInstance().getConfig();
+                                    BaseConfig config = BlockMinerMod.getInstance().getConfig();
                                     if (config.getDistanceCalculationMode() != DistanceCalculationMode.V1_19) {
                                         config.setDistanceCalculationMode(DistanceCalculationMode.V1_19);
                                         BlockMinerMod.getInstance().tryToSaveConfig();
@@ -245,7 +246,7 @@ public final class Command {
                                 })
                         ).then(literal("1.20.6")
                                 .executes(context -> {
-                                    Config config = BlockMinerMod.getInstance().getConfig();
+                                    BaseConfig config = BlockMinerMod.getInstance().getConfig();
                                     if (config.getDistanceCalculationMode() != DistanceCalculationMode.V1_20_6) {
                                         config.setDistanceCalculationMode(DistanceCalculationMode.V1_20_6);
                                         BlockMinerMod.getInstance().tryToSaveConfig();
@@ -262,7 +263,7 @@ public final class Command {
                         })
                         .then(literal("all")
                                 .executes(context -> {
-                                    Config config = BlockMinerMod.getInstance().getConfig();
+                                    BaseConfig config = BlockMinerMod.getInstance().getConfig();
                                     if (config.getSearchMode() != SearchMode.All) {
                                         config.setSearchMode(SearchMode.All);
                                         BlockMinerMod.getInstance().tryToSaveConfig();
@@ -273,7 +274,7 @@ public final class Command {
                                 })
                         ).then(literal("simple")
                                 .executes(context -> {
-                                    Config config = BlockMinerMod.getInstance().getConfig();
+                                    BaseConfig config = BlockMinerMod.getInstance().getConfig();
                                     if (config.getSearchMode() != SearchMode.Simple) {
                                         config.setSearchMode(SearchMode.Simple);
                                         BlockMinerMod.getInstance().tryToSaveConfig();
@@ -293,7 +294,7 @@ public final class Command {
                                         .then(
                                                 argument("block", getBlockStateArgumentType())
                                                         .executes(context -> {
-                                                            Config config = BlockMinerMod.getInstance().getConfig();
+                                                            BaseConfig config = BlockMinerMod.getInstance().getConfig();
                                                             Block input = context.getArgument("block", BlockStateArgument.class).getBlockState().getBlock();
                                                             if (config.blockWhitelist().add(input)) {
                                                                 BlockMinerMod.getInstance().tryToSaveConfig();
@@ -307,7 +308,7 @@ public final class Command {
                                         .then(
                                                 argument("block", getBlockStateArgumentType())
                                                         .executes(context -> {
-                                                            Config config = BlockMinerMod.getInstance().getConfig();
+                                                            BaseConfig config = BlockMinerMod.getInstance().getConfig();
                                                             Block input = context.getArgument("block", BlockStateArgument.class).getBlockState().getBlock();
                                                             if (config.blockWhitelist().remove(input)) {
                                                                 BlockMinerMod.getInstance().tryToSaveConfig();
@@ -329,7 +330,7 @@ public final class Command {
                                         .then(
                                                 argument("block", getBlockStateArgumentType())
                                                         .executes(context -> {
-                                                            Config config = BlockMinerMod.getInstance().getConfig();
+                                                            BaseConfig config = BlockMinerMod.getInstance().getConfig();
                                                             Block input = context.getArgument("block", BlockStateArgument.class).getBlockState().getBlock();
                                                             if (config.dependBlockWhitelistAdd(input)) {
                                                                 BlockMinerMod.getInstance().tryToSaveConfig();
@@ -343,7 +344,7 @@ public final class Command {
                                         .then(
                                                 argument("block", getBlockStateArgumentType())
                                                         .executes(context -> {
-                                                            Config config = BlockMinerMod.getInstance().getConfig();
+                                                            BaseConfig config = BlockMinerMod.getInstance().getConfig();
                                                             Block input = context.getArgument("block", BlockStateArgument.class).getBlockState().getBlock();
                                                             if (config.dependBlockWhitelistRemove(input)) {
                                                                 BlockMinerMod.getInstance().tryToSaveConfig();

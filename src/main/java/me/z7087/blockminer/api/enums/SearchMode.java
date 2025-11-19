@@ -1,4 +1,4 @@
-package me.z7087.blockminer.util.enums;
+package me.z7087.blockminer.api.enums;
 
 import me.z7087.blockminer.util.data.BlockBreakStructureFull;
 import me.z7087.blockminer.util.finder.BlockFinder;

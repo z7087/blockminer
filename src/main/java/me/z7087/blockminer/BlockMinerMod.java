@@ -1,5 +1,7 @@
 package me.z7087.blockminer;
 
+import me.z7087.blockminer.api.base.BaseConfig;
+import me.z7087.blockminer.api.base.IBlockMinerMod;
 import me.z7087.blockminer.command.Command;
 import me.z7087.blockminer.config.Config;
 import me.z7087.blockminer.task.TaskManager;
@@ -27,9 +29,9 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.util.function.Supplier;
 
-public final class BlockMinerMod implements ClientModInitializer {
+public final class BlockMinerMod implements IBlockMinerMod, ClientModInitializer {
     public interface ModConstants {
-        DynamicConstant<Config> config();
+        DynamicConstant<BaseConfig> config();
 
         TaskManager taskManager();
 
@@ -267,7 +269,7 @@ public final class BlockMinerMod implements ClientModInitializer {
             );
             final String[][] immutableNamesAndDescriptors = JavaHelper.getNamesAndDescriptors(
                     MethodHandles.lookup(),
-                    (Supplier<DynamicConstant<Config>> & Serializable) modConstantsEmptyImpl::config,
+                    (Supplier<DynamicConstant<BaseConfig>> & Serializable) modConstantsEmptyImpl::config,
                     (Supplier<TaskManager> & Serializable) modConstantsEmptyImpl::taskManager,
                     (Supplier<BlockBreakUtils> & Serializable) modConstantsEmptyImpl::blockBreakUtils,
                     (Supplier<RotationUtils> & Serializable) modConstantsEmptyImpl::rotationUtils
@@ -360,11 +362,13 @@ public final class BlockMinerMod implements ClientModInitializer {
         return INSTANCE.orElseThrow();
     }
 
-    public Config getConfig() {
+    @Override
+    public BaseConfig getConfig() {
         return MOD_CONSTANTS.orElseThrow().config().orElseThrow();
     }
 
-    public void setConfig(Config config) {
+    @Override
+    public void setConfig(BaseConfig config) {
         MOD_CONSTANTS.orElseThrow().config().set(config);
         MOD_CONSTANTS.orElseThrow().config().sync();
     }

@@ -1,6 +1,6 @@
 package me.z7087.blockminer.util.data;
 
-import me.z7087.blockminer.util.enums.PowerBlockType;
+import me.z7087.blockminer.api.enums.PowerBlockType;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
 import net.minecraft.world.World;
