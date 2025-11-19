@@ -1,153 +1,61 @@
 package me.z7087.blockminer.util.data;
 
-public abstract class Rotation {
-    public abstract boolean hasYaw();
+public final class Rotation {
+    public static final Rotation NONE = new Rotation(false, false, 0, 0);
+
+    public static Rotation ofYawOnly(float yaw) {
+        return new Rotation(true, false, yaw, 0);
+    }
+
+    public static Rotation ofPitchOnly(float pitch) {
+        return new Rotation(false, true, 0, pitch);
+    }
+
+    public static Rotation ofFull(float yaw, float pitch) {
+        return new Rotation(true, true, yaw, pitch);
+    }
+
+    private final boolean hasYaw;
+    private final boolean hasPitch;
+    private final float yaw;
+    private final float pitch;
+    private Rotation(boolean hasYaw, boolean hasPitch, float yaw, float pitch) {
+        this.hasYaw = hasYaw;
+        this.hasPitch = hasPitch;
+        this.yaw = hasYaw ? yaw : 0;
+        this.pitch = hasPitch ? pitch : 0;
+    }
+
+
+    public boolean hasYaw() {
+        return hasYaw;
+    }
 
     public float getYaw() {
         if (hasYaw())
-            return getYaw(0F);
-        throw new IllegalStateException("cannot get yaw from RotationUtils.Rotation." + this.getClass().getSimpleName());
+            return yaw;
+        throw new IllegalStateException("cannot get yaw from rotation that doesn't have yaw");
     }
 
-    public abstract float getYaw(float defaultYaw);
+    public float getYaw(float defaultYaw) {
+        if (hasYaw())
+            return yaw;
+        return defaultYaw;
+    }
 
-    public abstract boolean hasPitch();
+    public boolean hasPitch() {
+        return hasPitch;
+    }
 
     public float getPitch() {
         if (hasPitch())
-            return getPitch(0F);
-        throw new IllegalStateException("cannot get pitch from RotationUtils.Rotation." + this.getClass().getSimpleName());
+            return pitch;
+        throw new IllegalStateException("cannot get pitch from rotation that doesn't have pitch");
     }
 
-    public abstract float getPitch(float defaultPitch);
-
-    public static class None extends Rotation {
-        public static final None INSTANCE = new None();
-
-        @Override
-        public boolean hasYaw() {
-            return false;
-        }
-
-        @Override
-        public float getYaw(float defaultYaw) {
-            return defaultYaw;
-        }
-
-        @Override
-        public boolean hasPitch() {
-            return false;
-        }
-
-        @Override
-        public float getPitch(float defaultPitch) {
-            return defaultPitch;
-        }
-    }
-
-    public static class YawOnly extends Rotation {
-        private final float yaw;
-
-        public YawOnly(float yaw) {
-            this.yaw = yaw;
-        }
-
-        @Override
-        public boolean hasYaw() {
-            return true;
-        }
-
-        @Override
-        public float getYaw() {
-            return yaw;
-        }
-
-        @Override
-        public float getYaw(float defaultYaw) {
-            return yaw;
-        }
-
-        @Override
-        public boolean hasPitch() {
-            return false;
-        }
-
-        @Override
-        public float getPitch(float defaultPitch) {
-            return defaultPitch;
-        }
-    }
-
-    public static class PitchOnly extends Rotation {
-        private final float pitch;
-
-        public PitchOnly(float pitch) {
-            this.pitch = pitch;
-        }
-
-        @Override
-        public boolean hasYaw() {
-            return false;
-        }
-
-        @Override
-        public float getYaw(float defaultYaw) {
-            return defaultYaw;
-        }
-
-        @Override
-        public boolean hasPitch() {
-            return true;
-        }
-
-        @Override
-        public float getPitch() {
+    public float getPitch(float defaultPitch) {
+        if (hasPitch())
             return pitch;
-        }
-
-        @Override
-        public float getPitch(float defaultPitch) {
-            return pitch;
-        }
-    }
-
-    public static class Full extends Rotation {
-        private final float yaw;
-        private final float pitch;
-
-        public Full(float yaw, float pitch) {
-            this.yaw = yaw;
-            this.pitch = pitch;
-        }
-
-        @Override
-        public boolean hasYaw() {
-            return true;
-        }
-
-        @Override
-        public float getYaw() {
-            return yaw;
-        }
-
-        @Override
-        public float getYaw(float defaultYaw) {
-            return yaw;
-        }
-
-        @Override
-        public boolean hasPitch() {
-            return true;
-        }
-
-        @Override
-        public float getPitch() {
-            return pitch;
-        }
-
-        @Override
-        public float getPitch(float defaultPitch) {
-            return pitch;
-        }
+        return defaultPitch;
     }
 }

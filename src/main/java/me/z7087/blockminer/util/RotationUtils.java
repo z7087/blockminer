@@ -57,7 +57,7 @@ public abstract class RotationUtils {
 
     public static RotationUtils createInstance() {
         final Deque<Rotation> rotations = new ArrayDeque<>();
-        rotations.add(Rotation.None.INSTANCE);
+        rotations.add(Rotation.NONE);
         try {
             return (RotationUtils) CONSTRUCTOR.invokeExact(
                     rotations
@@ -118,7 +118,7 @@ public abstract class RotationUtils {
         if ((oldRotation.hasYaw() && oldRotation.getYaw() != yaw)
                 || (oldRotation.hasPitch() && oldRotation.getPitch() != pitch))
             return false;
-        setRotation(new Rotation.Full(yaw, pitch));
+        setRotation(Rotation.ofFull(yaw, pitch));
         return true;
     }
 
@@ -132,9 +132,9 @@ public abstract class RotationUtils {
         if (oldRotation.hasYaw() && oldRotation.getYaw() != yaw)
             return false;
         else if (oldRotation.hasPitch())
-            setRotation(new Rotation.Full(yaw, oldRotation.getPitch()));
+            setRotation(Rotation.ofFull(yaw, oldRotation.getPitch()));
         else
-            setRotation(new Rotation.YawOnly(yaw));
+            setRotation(Rotation.ofYawOnly(yaw));
         return true;
     }
 
@@ -148,9 +148,9 @@ public abstract class RotationUtils {
         if (oldRotation.hasPitch() && oldRotation.getPitch() != pitch)
             return false;
         if (oldRotation.hasYaw())
-            setRotation(new Rotation.Full(oldRotation.getYaw(), pitch));
+            setRotation(Rotation.ofFull(oldRotation.getYaw(), pitch));
         else
-            setRotation(new Rotation.PitchOnly(pitch));
+            setRotation(Rotation.ofPitchOnly(pitch));
         return true;
     }
 
@@ -174,7 +174,7 @@ public abstract class RotationUtils {
                 originBoundingBox = player.getBoundingBox();
                 player.setPosition(x, y, z);
             }
-            pushRotation(new Rotation.Full(yaw, pitch));
+            pushRotation(Rotation.ofFull(yaw, pitch));
             if (onGroundStateChanged)
                 player.setOnGround(onGround);
             playerAccessor.invokeSendMovementPackets();
@@ -229,7 +229,7 @@ public abstract class RotationUtils {
                 && MinecraftClient.getInstance().getCameraEntity() == player
         ) {
             final ClientPlayerEntityAccessor playerAccessor = (ClientPlayerEntityAccessor) player;
-            pushRotation(new Rotation.Full(yaw, pitch));
+            pushRotation(Rotation.ofFull(yaw, pitch));
             playerAccessor.invokeSendMovementPackets();
             runnable.run();
             popRotation();
@@ -269,7 +269,7 @@ public abstract class RotationUtils {
 
     public void forceClearRotations() {
         rotations().clear();
-        rotations().add(Rotation.None.INSTANCE);
+        rotations().add(Rotation.NONE);
     }
 
     public void resetRotationIfNoKeepRotation() {
@@ -279,6 +279,6 @@ public abstract class RotationUtils {
         if (keepRotationToNextTick())
             keepRotationToNextTick(false);
         else
-            setRotation(Rotation.None.INSTANCE);
+            setRotation(Rotation.NONE);
     }
 }
