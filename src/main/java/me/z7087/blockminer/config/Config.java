@@ -109,6 +109,15 @@ public abstract class Config extends BaseConfig {
         }
     }
 
+    protected abstract DynamicConstant<Boolean> debug();
+    protected abstract DynamicConstant<Boolean> headlessPistonMode();
+    protected abstract DynamicConstant<Boolean> blinkDuringTasksTick();
+    protected abstract DynamicConstant<Boolean> autoClearAfterTask();
+    protected abstract DynamicConstant<Integer> pingSpikeThreshold();
+    protected abstract DynamicConstant<PowerBlockType> powerBlockUsage();
+    protected abstract DynamicConstant<DistanceCalculationMode> distanceCalculationMode();
+    protected abstract DynamicConstant<SearchMode> searchMode();
+
     public static Config createDefaultConfig() {
         final Config config = Config.createInstance();
         config.blockWhitelist().addAll(getDefaultBlockWhitelist());
