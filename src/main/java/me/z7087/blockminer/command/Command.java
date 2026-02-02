@@ -4,6 +4,7 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import it.unimi.dsi.fastutil.booleans.BooleanConsumer;
 import me.z7087.blockminer.BlockMinerMod;
 import me.z7087.blockminer.api.base.BaseConfig;
 import me.z7087.blockminer.command.argument.BlockPosArgumentType;
@@ -19,6 +20,7 @@ import net.minecraft.text.Text;
 import net.minecraft.util.math.BlockPos;
 
 import java.io.IOException;
+import java.util.function.*;
 
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument;
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal;
@@ -47,6 +49,89 @@ public final class Command {
         //#else
         //$$ return BlockStateArgumentType.blockState();
         //#endif
+    }
+
+    private static LiteralArgumentBuilder<FabricClientCommandSource> boolConfigArgBuilder(
+            String name,
+            BooleanSupplier getter,
+            BooleanConsumer setter
+    ) {
+        return literal(name)
+                .executes((context) -> {
+                    context.getSource().sendFeedback(Text.of(String.valueOf(getter.getAsBoolean())));
+                    return 1;
+                })
+                .then(
+                        argument("bool", BoolArgumentType.bool())
+                                .executes(context -> {
+                                    boolean input = BoolArgumentType.getBool(context, "bool");
+                                    if (getter.getAsBoolean() != input) {
+                                        setter.accept(input);
+                                        BlockMinerMod.getInstance().tryToSaveConfig();
+                                        return 1;
+                                    }
+                                    context.getSource().sendFeedback(Text.of("\"" + name + "\" already set to " + input));
+                                    return 0;
+                                })
+                );
+    }
+
+    @SuppressWarnings("SameParameterValue")
+    private static LiteralArgumentBuilder<FabricClientCommandSource> intConfigArgBuilder(
+            String name,
+            int min,
+            int max,
+            IntSupplier getter,
+            IntConsumer setter
+    ) {
+        return literal(name)
+                .executes((context) -> {
+                    context.getSource().sendFeedback(Text.of(String.valueOf(getter.getAsInt())));
+                    return 1;
+                })
+                .then(
+                        argument("integer", IntegerArgumentType.integer(min, max))
+                                .executes(context -> {
+                                    int input = IntegerArgumentType.getInteger(context, "integer");
+                                    if (getter.getAsInt() != input) {
+                                        setter.accept(input);
+                                        BlockMinerMod.getInstance().tryToSaveConfig();
+                                        return 1;
+                                    }
+                                    context.getSource().sendFeedback(Text.of("\"" + name + "\" already set to " + input));
+                                    return 0;
+                                })
+                );
+    }
+
+
+    private static <T> LiteralArgumentBuilder<FabricClientCommandSource> enumConfigArgBuilder(
+            String name,
+            T[] values,
+            Supplier<T> getter,
+            Consumer<T> setter
+    ) {
+        LiteralArgumentBuilder<FabricClientCommandSource> builder =
+                literal(name)
+                        .executes((context) -> {
+                            context.getSource().sendFeedback(Text.of(getter.get().toString()));
+                            return 1;
+                        });
+        for (T enumValue : values) {
+            builder = builder.then(
+                    literal(enumValue.toString())
+                            .executes(context -> {
+                                if (!getter.get().equals(enumValue)) {
+                                    setter.accept(enumValue);
+                                    BlockMinerMod.getInstance().tryToSaveConfig();
+                                    return 1;
+                                }
+                                context.getSource().sendFeedback(Text.of("\"" + name + "\" already set to \"" + enumValue + "\""));
+                                return 0;
+                            })
+            );
+        }
+        return builder;
     }
 
     private void registerInternal(CommandDispatcher<FabricClientCommandSource> dispatcher) {
@@ -83,206 +168,63 @@ public final class Command {
                                     return 1;
                                 })
                         )
-                ).then(literal("debug")
-                        .executes((context) -> {
-                            context.getSource().sendFeedback(Text.of(String.valueOf(BlockMinerMod.getInstance().getConfig().isDebug())));
-                            return 1;
-                        })
-                        .then(
-                                argument("bool", BoolArgumentType.bool())
-                                        .executes(context -> {
-                                            BaseConfig config = BlockMinerMod.getInstance().getConfig();
-                                            boolean input = BoolArgumentType.getBool(context, "bool");
-                                            if (config.isDebug() != input) {
-                                                config.setDebug(input);
-                                                BlockMinerMod.getInstance().tryToSaveConfig();
-                                                return 1;
-                                            }
-                                            context.getSource().sendFeedback(Text.of("debug already set to " + input));
-                                            return 0;
-                                        })
+                ).then(
+                        boolConfigArgBuilder(
+                                "debug",
+                                () -> BlockMinerMod.getInstance().getConfig().isDebug(),
+                                (value) -> BlockMinerMod.getInstance().getConfig().setDebug(value)
                         )
-                ).then(literal("headless-piston-mode")
-                        .executes((context) -> {
-                            context.getSource().sendFeedback(Text.of(String.valueOf(BlockMinerMod.getInstance().getConfig().isHeadlessPistonMode())));
-                            return 1;
-                        })
-                        .then(
-                                argument("bool", BoolArgumentType.bool())
-                                        .executes(context -> {
-                                            BaseConfig config = BlockMinerMod.getInstance().getConfig();
-                                            boolean input = BoolArgumentType.getBool(context, "bool");
-                                            if (config.isHeadlessPistonMode() != input) {
-                                                config.setHeadlessPistonMode(input);
-                                                BlockMinerMod.getInstance().tryToSaveConfig();
-                                                return 1;
-                                            }
-                                            context.getSource().sendFeedback(Text.of("headless-piston-mode already set to " + input));
-                                            return 0;
-                                        })
+                ).then(
+                        boolConfigArgBuilder(
+                                "headless-piston-mode",
+                                () -> BlockMinerMod.getInstance().getConfig().isHeadlessPistonMode(),
+                                (value) -> BlockMinerMod.getInstance().getConfig().setHeadlessPistonMode(value)
                         )
-                ).then(literal("blink-during-tasks-tick")
-                        .executes((context) -> {
-                            context.getSource().sendFeedback(Text.of(String.valueOf(BlockMinerMod.getInstance().getConfig().isBlinkDuringTasksTick())));
-                            return 1;
-                        })
-                        .then(
-                                argument("bool", BoolArgumentType.bool())
-                                        .executes(context -> {
-                                            BaseConfig config = BlockMinerMod.getInstance().getConfig();
-                                            boolean input = BoolArgumentType.getBool(context, "bool");
-                                            if (config.isBlinkDuringTasksTick() != input) {
-                                                config.setBlinkDuringTasksTick(input);
-                                                BlockMinerMod.getInstance().tryToSaveConfig();
-                                                return 1;
-                                            }
-                                            context.getSource().sendFeedback(Text.of("blink-during-tasks-tick already set to " + input));
-                                            return 0;
-                                        })
+                ).then(
+                        boolConfigArgBuilder(
+                                "headless-piston-mode",
+                                () -> BlockMinerMod.getInstance().getConfig().isHeadlessPistonMode(),
+                                (value) -> BlockMinerMod.getInstance().getConfig().setHeadlessPistonMode(value)
                         )
-                ).then(literal("auto-clear-after-task")
-                        .executes((context) -> {
-                            context.getSource().sendFeedback(Text.of(String.valueOf(BlockMinerMod.getInstance().getConfig().isAutoClearAfterTask())));
-                            return 1;
-                        })
-                        .then(
-                                argument("bool", BoolArgumentType.bool())
-                                        .executes(context -> {
-                                            BaseConfig config = BlockMinerMod.getInstance().getConfig();
-                                            boolean input = BoolArgumentType.getBool(context, "bool");
-                                            if (config.isAutoClearAfterTask() != input) {
-                                                config.setAutoClearAfterTask(input);
-                                                BlockMinerMod.getInstance().tryToSaveConfig();
-                                                return 1;
-                                            }
-                                            context.getSource().sendFeedback(Text.of("auto-clear-after-task already set to " + input));
-                                            return 0;
-                                        })
+                ).then(
+                        boolConfigArgBuilder(
+                                "blink-during-tasks-tick",
+                                () -> BlockMinerMod.getInstance().getConfig().isBlinkDuringTasksTick(),
+                                (value) -> BlockMinerMod.getInstance().getConfig().setBlinkDuringTasksTick(value)
                         )
-                ).then(literal("ping-spike-threshold")
-                        .executes((context) -> {
-                            context.getSource().sendFeedback(Text.of(String.valueOf(BlockMinerMod.getInstance().getConfig().getPingSpikeThreshold())));
-                            return 1;
-                        })
-                        .then(
-                                argument("integer", IntegerArgumentType.integer(0, 1200))
-                                        .executes(context -> {
-                                            BaseConfig config = BlockMinerMod.getInstance().getConfig();
-                                            int input = IntegerArgumentType.getInteger(context, "integer");
-                                            if (config.getPingSpikeThreshold() != input) {
-                                                config.setPingSpikeThreshold(input);
-                                                BlockMinerMod.getInstance().tryToSaveConfig();
-                                                return 1;
-                                            }
-                                            context.getSource().sendFeedback(Text.of("ping-spike-threshold already set to " + input));
-                                            return 0;
-                                        })
+                ).then(
+                        boolConfigArgBuilder(
+                                "auto-clear-after-task",
+                                () -> BlockMinerMod.getInstance().getConfig().isAutoClearAfterTask(),
+                                (value) -> BlockMinerMod.getInstance().getConfig().setAutoClearAfterTask(value)
                         )
-                ).then(literal("power-block-usage")
-                        .executes((context) -> {
-                            context.getSource().sendFeedback(Text.of(BlockMinerMod.getInstance().getConfig().getPowerBlockUsage().toString()));
-                            return 1;
-                        })
-                        .then(literal("redstone-torch")
-                                .executes(context -> {
-                                    BaseConfig config = BlockMinerMod.getInstance().getConfig();
-                                    if (config.getPowerBlockUsage() != PowerBlockType.RedstoneTorch) {
-                                        config.setPowerBlockUsage(PowerBlockType.RedstoneTorch);
-                                        BlockMinerMod.getInstance().tryToSaveConfig();
-                                        return 1;
-                                    }
-                                    context.getSource().sendFeedback(Text.of("ping-spike-threshold already set to \"redstone-torch\""));
-                                    return 0;
-                                })
-                        ).then(literal("lever")
-                                .executes(context -> {
-                                    BaseConfig config = BlockMinerMod.getInstance().getConfig();
-                                    if (config.getPowerBlockUsage() != PowerBlockType.Lever) {
-                                        config.setPowerBlockUsage(PowerBlockType.Lever);
-                                        BlockMinerMod.getInstance().tryToSaveConfig();
-                                        return 1;
-                                    }
-                                    context.getSource().sendFeedback(Text.of("ping-spike-threshold already set to \"lever\""));
-                                    return 0;
-                                })
-                        ).then(literal("both")
-                                .executes(context -> {
-                                    BaseConfig config = BlockMinerMod.getInstance().getConfig();
-                                    if (config.getPowerBlockUsage() != PowerBlockType.Both) {
-                                        config.setPowerBlockUsage(PowerBlockType.Both);
-                                        BlockMinerMod.getInstance().tryToSaveConfig();
-                                        return 1;
-                                    }
-                                    context.getSource().sendFeedback(Text.of("ping-spike-threshold already set to \"both\""));
-                                    return 0;
-                                })
+                ).then(
+                        intConfigArgBuilder(
+                                "ping-spike-threshold",
+                                0, 1200,
+                                () -> BlockMinerMod.getInstance().getConfig().getPingSpikeThreshold(),
+                                (value) -> BlockMinerMod.getInstance().getConfig().setPingSpikeThreshold(value)
                         )
-                ).then(literal("distance-calculation-mode")
-                        .executes((context) -> {
-                            context.getSource().sendFeedback(Text.of(BlockMinerMod.getInstance().getConfig().getDistanceCalculationMode().toString()));
-                            return 1;
-                        })
-                        .then(literal("old")
-                                .executes(context -> {
-                                    BaseConfig config = BlockMinerMod.getInstance().getConfig();
-                                    if (config.getDistanceCalculationMode() != DistanceCalculationMode.Old) {
-                                        config.setDistanceCalculationMode(DistanceCalculationMode.Old);
-                                        BlockMinerMod.getInstance().tryToSaveConfig();
-                                        return 1;
-                                    }
-                                    context.getSource().sendFeedback(Text.of("distance-calculation-mode already set to \"old\""));
-                                    return 0;
-                                })
-                        ).then(literal("1.19")
-                                .executes(context -> {
-                                    BaseConfig config = BlockMinerMod.getInstance().getConfig();
-                                    if (config.getDistanceCalculationMode() != DistanceCalculationMode.V1_19) {
-                                        config.setDistanceCalculationMode(DistanceCalculationMode.V1_19);
-                                        BlockMinerMod.getInstance().tryToSaveConfig();
-                                        return 1;
-                                    }
-                                    context.getSource().sendFeedback(Text.of("distance-calculation-mode already set to \"1.19\""));
-                                    return 0;
-                                })
-                        ).then(literal("1.20.6")
-                                .executes(context -> {
-                                    BaseConfig config = BlockMinerMod.getInstance().getConfig();
-                                    if (config.getDistanceCalculationMode() != DistanceCalculationMode.V1_20_6) {
-                                        config.setDistanceCalculationMode(DistanceCalculationMode.V1_20_6);
-                                        BlockMinerMod.getInstance().tryToSaveConfig();
-                                        return 1;
-                                    }
-                                    context.getSource().sendFeedback(Text.of("distance-calculation-mode already set to \"1.20.6\""));
-                                    return 0;
-                                })
+                ).then(
+                        enumConfigArgBuilder(
+                                "power-block-usage",
+                                PowerBlockType.values(),
+                                () -> BlockMinerMod.getInstance().getConfig().getPowerBlockUsage(),
+                                (value) -> BlockMinerMod.getInstance().getConfig().setPowerBlockUsage(value)
                         )
-                ).then(literal("search-mode")
-                        .executes((context) -> {
-                            context.getSource().sendFeedback(Text.of(BlockMinerMod.getInstance().getConfig().getSearchMode().toString()));
-                            return 1;
-                        })
-                        .then(literal("all")
-                                .executes(context -> {
-                                    BaseConfig config = BlockMinerMod.getInstance().getConfig();
-                                    if (config.getSearchMode() != SearchMode.All) {
-                                        config.setSearchMode(SearchMode.All);
-                                        BlockMinerMod.getInstance().tryToSaveConfig();
-                                        return 1;
-                                    }
-                                    context.getSource().sendFeedback(Text.of("search-mode already set to \"all\""));
-                                    return 0;
-                                })
-                        ).then(literal("simple")
-                                .executes(context -> {
-                                    BaseConfig config = BlockMinerMod.getInstance().getConfig();
-                                    if (config.getSearchMode() != SearchMode.Simple) {
-                                        config.setSearchMode(SearchMode.Simple);
-                                        BlockMinerMod.getInstance().tryToSaveConfig();
-                                        return 1;
-                                    }
-                                    context.getSource().sendFeedback(Text.of("search-mode already set to \"simple\""));
-                                    return 0;
-                                })
+                ).then(
+                        enumConfigArgBuilder(
+                                "distance-calculation-mode",
+                                DistanceCalculationMode.values(),
+                                () -> BlockMinerMod.getInstance().getConfig().getDistanceCalculationMode(),
+                                (value) -> BlockMinerMod.getInstance().getConfig().setDistanceCalculationMode(value)
+                        )
+                ).then(
+                        enumConfigArgBuilder(
+                                "search-mode",
+                                SearchMode.values(),
+                                () -> BlockMinerMod.getInstance().getConfig().getSearchMode(),
+                                (value) -> BlockMinerMod.getInstance().getConfig().setSearchMode(value)
                         )
                 ).then(literal("target-block")
                         .then(literal("whitelist")
