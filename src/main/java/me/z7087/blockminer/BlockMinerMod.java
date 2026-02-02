@@ -10,6 +10,7 @@ import me.z7087.blockminer.util.InventoryUtils;
 import me.z7087.blockminer.util.RotationUtils;
 import me.z7087.blockminer.util.finder.BlockFinder;
 import me.z7087.blockminer.util.finder.NoHorizontalBlockFinder;
+import me.z7087.blockminer.util.finder.NoHorizontalSimpleBlockFinder;
 import me.z7087.blockminer.util.finder.SimpleBlockFinder;
 import me.z7087.final2constant.Constant;
 import me.z7087.final2constant.DynamicConstant;
@@ -334,6 +335,7 @@ public final class BlockMinerMod implements IBlockMinerMod, ClientModInitializer
             ensureClassInitialized(loader, BlockFinder.StructureFilterCache.class);
             ensureClassInitialized(loader, SimpleBlockFinder.StructureFilterCache.class);
             ensureClassInitialized(loader, NoHorizontalBlockFinder.StructureFilterCache.class);
+            ensureClassInitialized(loader, NoHorizontalSimpleBlockFinder.StructureFilterCache.class);
         }, "BlockMinerMod Classes Background Loader");
         thread.setDaemon(true);
         thread.setPriority(Thread.MIN_PRIORITY);
