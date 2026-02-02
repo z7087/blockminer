@@ -1,9 +1,7 @@
 package me.z7087.blockminer.api.enums;
 
 import me.z7087.blockminer.util.data.BlockBreakStructureFull;
-import me.z7087.blockminer.util.finder.BlockFinder;
-import me.z7087.blockminer.util.finder.NoHorizontalBlockFinder;
-import me.z7087.blockminer.util.finder.SimpleBlockFinder;
+import me.z7087.blockminer.util.finder.*;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 
@@ -12,7 +10,8 @@ import java.util.stream.Stream;
 public enum SearchMode {
     All("all"),
     Simple("simple"),
-    NoHorizontal("no-horizontal");
+    NoHorizontal("no-horizontal"),
+    NoHorizontalSimple("no-horizontal-simple");
 
     private final String name;
 
@@ -30,6 +29,8 @@ public enum SearchMode {
                 return Simple;
             case "no-horizontal":
                 return NoHorizontal;
+            case "no-horizontal-simple":
+                return NoHorizontalSimple;
         }
         throw new IllegalArgumentException(
                 "No enum constant " + SearchMode.class.getCanonicalName() + "." + name);
@@ -48,6 +49,8 @@ public enum SearchMode {
                 return SimpleBlockFinder.StructureFilterCache.findPossibleFullStructuresInCache(world, targetPos, powerBlockUsage, hasDependBlock);
             case NoHorizontal:
                 return NoHorizontalBlockFinder.StructureFilterCache.findPossibleFullStructuresInCache(world, targetPos, powerBlockUsage, hasDependBlock);
+            case NoHorizontalSimple:
+                return NoHorizontalSimpleBlockFinder.StructureFilterCache.findPossibleFullStructuresInCache(world, targetPos, powerBlockUsage, hasDependBlock);
         }
         throw new AssertionError();
     }
