@@ -267,7 +267,7 @@ public class Task implements Comparable<Task> {
             inventory = ticklyUpdateConstants.inventory();
         }
         final BlockState dependBlockState = world.getBlockState(structure.getDependBlockPos());
-        if (inventory.getStack(pistonIndex).getItem() != Items.PISTON
+        if ((inventory.getStack(pistonIndex).getItem() != Items.PISTON && (BlockMinerMod.getInstance().getConfig().isHeadlessPistonMode() && inventory.getStack(pistonIndex).getItem() != Items.STICKY_PISTON))
                 || (dependBlockIndex != -1 && !BlockMinerMod.getInstance().getConfig().dependBlockWhitelistContains(inventory.getStack(dependBlockIndex).getItem()))
                 || (redstoneTorchIndex != -1 && inventory.getStack(redstoneTorchIndex).getItem() != Items.REDSTONE_TORCH)
                 || (leverIndex != -1 && inventory.getStack(leverIndex).getItem() != Items.LEVER)
