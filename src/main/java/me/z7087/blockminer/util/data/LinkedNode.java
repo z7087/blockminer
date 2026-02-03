@@ -1,5 +1,5 @@
 package me.z7087.blockminer.util.data;
-
+/*
 import java.util.Objects;
 
 // 我忘记我搞这个要做什么了
@@ -48,3 +48,4 @@ public class LinkedNode {
         return hash;
     }
 }
+*/

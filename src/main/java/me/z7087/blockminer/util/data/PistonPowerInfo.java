@@ -1,5 +1,5 @@
 package me.z7087.blockminer.util.data;
-
+/*
 import me.z7087.blockminer.api.enums.PowerBlockType;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
@@ -62,3 +62,4 @@ public final class PistonPowerInfo {
                 '}';
     }
 }
+*/
