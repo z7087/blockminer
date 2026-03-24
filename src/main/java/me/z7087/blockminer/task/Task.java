@@ -739,7 +739,7 @@ public class Task implements Comparable<Task> {
                                     break;
                                 }
                                 default: {
-                                    leverFace = dependBlockNearPosState.get(Properties.FACING);
+                                    leverFace = dependBlockNearPosState.get(LeverBlock.FACING);
                                     break;
                                 }
                             }

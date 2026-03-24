@@ -274,7 +274,7 @@ public final class BlockBreakStructure implements Comparable<BlockBreakStructure
                         if (powerBlockFace !=
                                 (
                                         (powerBlockPosBlock instanceof WallRedstoneTorchBlock)
-                                                ? powerBlockPosState.get(Properties.FACING)
+                                                ? powerBlockPosState.get(WallRedstoneTorchBlock.FACING)
                                                 : Direction.UP
                                 )
                         ) {
@@ -301,7 +301,7 @@ public final class BlockBreakStructure implements Comparable<BlockBreakStructure
                                 break;
                             }
                             default: {
-                                if (powerBlockFace != powerBlockPosState.get(Properties.FACING))
+                                if (powerBlockFace != powerBlockPosState.get(LeverBlock.FACING))
                                     return false;
                                 break;
                             }
