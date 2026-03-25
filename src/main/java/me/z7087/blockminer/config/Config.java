@@ -143,7 +143,7 @@ public abstract class Config extends BaseConfig {
         //noinspection TryFinallyCanBeTryWithResources
         try {
             reader = new FileReader(PATH_CONFIG);
-            return GSON.fromJson(reader, Config.class);
+            return (Config) GSON.fromJson(reader, BaseConfig.class);
         } catch (FileNotFoundException ignored) {
             return null;
         } catch (Exception e) {
