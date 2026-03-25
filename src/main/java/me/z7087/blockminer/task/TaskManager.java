@@ -25,7 +25,7 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.ref.WeakReference;
 import java.util.*;
-import java.util.function.Supplier;
+import java.util.function.Function;
 
 // 单方块方案：
 // 先拿到所有可能的活塞能源方块放置方法
@@ -44,17 +44,13 @@ public abstract class TaskManager {
     static {
         final String[] immutableNames, immutableDescriptors;
         try {
-            TaskManager taskManagerEmptyImpl = Constant.factory.ofEmptyAbstractImplInstance(
-                    MethodHandles.lookup(),
-                    TaskManager.class
-            );
             final String[][] immutableNamesAndDescriptors = JavaHelper.getNamesAndDescriptors(
                     MethodHandles.lookup(),
-                    (Supplier<DynamicConstant<Boolean>> & Serializable) taskManagerEmptyImpl::enabled,
-                    (Supplier<DynamicConstant<WeakReference<ClientWorld>>> & Serializable) taskManagerEmptyImpl::prevWorldRef,
-                    (Supplier<Set<BlockPos>> & Serializable) taskManagerEmptyImpl::posSet,
-                    (Supplier<LinkedList<Task>> & Serializable) taskManagerEmptyImpl::taskQueue,
-                    (Supplier<PositionStorage> & Serializable) taskManagerEmptyImpl::positionsToClear
+                    (Function<TaskManager, DynamicConstant<Boolean>> & Serializable) TaskManager::enabled,
+                    (Function<TaskManager, DynamicConstant<WeakReference<ClientWorld>>> & Serializable) TaskManager::prevWorldRef,
+                    (Function<TaskManager, Set<BlockPos>> & Serializable) TaskManager::posSet,
+                    (Function<TaskManager, LinkedList<Task>> & Serializable) TaskManager::taskQueue,
+                    (Function<TaskManager, PositionStorage> & Serializable) TaskManager::positionsToClear
             );
             immutableNames = immutableNamesAndDescriptors[0];
             immutableDescriptors = immutableNamesAndDescriptors[1];

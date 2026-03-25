@@ -24,7 +24,7 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.function.Supplier;
+import java.util.function.Function;
 
 public abstract class Config extends BaseConfig {
     public static final File PATH_CONFIG = new File(FabricLoader.getInstance().getConfigDir().toFile(), BlockMinerMod.MOD_ID + ".json");
@@ -41,23 +41,19 @@ public abstract class Config extends BaseConfig {
     static {
         final String[] immutableNames, immutableDescriptors;
         try {
-            Config configEmptyImpl = Constant.factory.ofEmptyAbstractImplInstance(
-                    MethodHandles.lookup(),
-                    Config.class
-            );
             final String[][] immutableNamesAndDescriptors = JavaHelper.getNamesAndDescriptors(
                     MethodHandles.lookup(),
-                    (Supplier<DynamicConstant<Boolean>> & Serializable) configEmptyImpl::debug,
-                    (Supplier<DynamicConstant<Boolean>> & Serializable) configEmptyImpl::headlessPistonMode,
-                    (Supplier<DynamicConstant<Boolean>> & Serializable) configEmptyImpl::blinkDuringTasksTick,
-                    (Supplier<DynamicConstant<Boolean>> & Serializable) configEmptyImpl::autoClearAfterTask,
-                    (Supplier<DynamicConstant<Integer>> & Serializable) configEmptyImpl::pingSpikeThreshold,
-                    (Supplier<DynamicConstant<PowerBlockType>> & Serializable) configEmptyImpl::powerBlockUsage,
-                    (Supplier<DynamicConstant<DistanceCalculationMode>> & Serializable) configEmptyImpl::distanceCalculationMode,
-                    (Supplier<DynamicConstant<SearchMode>> & Serializable) configEmptyImpl::searchMode,
-                    (Supplier<Set<Block>> & Serializable) configEmptyImpl::blockWhitelist,
-                    (Supplier<Set<Block>> & Serializable) configEmptyImpl::dependBlockWhitelist,
-                    (Supplier<Set<Item>> & Serializable) configEmptyImpl::dependBlockItemWhitelist
+                    (Function<Config, DynamicConstant<Boolean>> & Serializable) Config::debug,
+                    (Function<Config, DynamicConstant<Boolean>> & Serializable) Config::headlessPistonMode,
+                    (Function<Config, DynamicConstant<Boolean>> & Serializable) Config::blinkDuringTasksTick,
+                    (Function<Config, DynamicConstant<Boolean>> & Serializable) Config::autoClearAfterTask,
+                    (Function<Config, DynamicConstant<Integer>> & Serializable) Config::pingSpikeThreshold,
+                    (Function<Config, DynamicConstant<PowerBlockType>> & Serializable) Config::powerBlockUsage,
+                    (Function<Config, DynamicConstant<DistanceCalculationMode>> & Serializable) Config::distanceCalculationMode,
+                    (Function<Config, DynamicConstant<SearchMode>> & Serializable) Config::searchMode,
+                    (Function<Config, Set<Block>> & Serializable) Config::blockWhitelist,
+                    (Function<Config, Set<Block>> & Serializable) Config::dependBlockWhitelist,
+                    (Function<Config, Set<Item>> & Serializable) Config::dependBlockItemWhitelist
             );
             immutableNames = immutableNamesAndDescriptors[0];
             immutableDescriptors = immutableNamesAndDescriptors[1];

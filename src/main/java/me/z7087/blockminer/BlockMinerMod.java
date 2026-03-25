@@ -29,7 +29,7 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
-import java.util.function.Supplier;
+import java.util.function.Function;
 
 public final class BlockMinerMod implements IBlockMinerMod, ClientModInitializer {
     public interface ModConstants {
@@ -48,13 +48,9 @@ public final class BlockMinerMod implements IBlockMinerMod, ClientModInitializer
         static {
             final String[] immutableNames, immutableDescriptors;
             try {
-                StableConstants stableConstantsEmptyImpl = Constant.factory.ofEmptyAbstractImplInstance(
-                        MethodHandles.lookup(),
-                        StableConstants.class
-                );
                 final String[][] immutableNamesAndDescriptors = JavaHelper.getNamesAndDescriptors(
                         MethodHandles.lookup(),
-                        (Supplier<DynamicConstant<MinecraftClient>> & Serializable) stableConstantsEmptyImpl::minecraftClient
+                        (Function<StableConstants, DynamicConstant<MinecraftClient>> & Serializable) StableConstants::minecraftClient
                 );
                 immutableNames = immutableNamesAndDescriptors[0];
                 immutableDescriptors = immutableNamesAndDescriptors[1];
@@ -112,17 +108,13 @@ public final class BlockMinerMod implements IBlockMinerMod, ClientModInitializer
         static {
             final String[] immutableNames, immutableDescriptors;
             try {
-                TicklyUpdateConstants ticklyUpdateConstantsEmptyImpl = Constant.factory.ofEmptyAbstractImplInstance(
-                        MethodHandles.lookup(),
-                        TicklyUpdateConstants.class
-                );
                 final String[][] immutableNamesAndDescriptors = JavaHelper.getNamesAndDescriptors(
                         MethodHandles.lookup(),
-                        (Supplier<DynamicConstant<ClientPlayerEntity>> & Serializable) ticklyUpdateConstantsEmptyImpl::clientPlayerEntity,
-                        (Supplier<DynamicConstant<PlayerInventory>> & Serializable) ticklyUpdateConstantsEmptyImpl::clientPlayerInventory,
-                        (Supplier<DynamicConstant<PlayerScreenHandler>> & Serializable) ticklyUpdateConstantsEmptyImpl::clientPlayerScreenHandler,
-                        (Supplier<DynamicConstant<ClientPlayerInteractionManager>> & Serializable) ticklyUpdateConstantsEmptyImpl::clientPlayerInteractionManager,
-                        (Supplier<DynamicConstant<ClientWorld>> & Serializable) ticklyUpdateConstantsEmptyImpl::clientWorld
+                        (Function<TicklyUpdateConstants, DynamicConstant<ClientPlayerEntity>> & Serializable) TicklyUpdateConstants::clientPlayerEntity,
+                        (Function<TicklyUpdateConstants, DynamicConstant<PlayerInventory>> & Serializable) TicklyUpdateConstants::clientPlayerInventory,
+                        (Function<TicklyUpdateConstants, DynamicConstant<PlayerScreenHandler>> & Serializable) TicklyUpdateConstants::clientPlayerScreenHandler,
+                        (Function<TicklyUpdateConstants, DynamicConstant<ClientPlayerInteractionManager>> & Serializable) TicklyUpdateConstants::clientPlayerInteractionManager,
+                        (Function<TicklyUpdateConstants, DynamicConstant<ClientWorld>> & Serializable) TicklyUpdateConstants::clientWorld
                 );
                 immutableNames = immutableNamesAndDescriptors[0];
                 immutableDescriptors = immutableNamesAndDescriptors[1];
@@ -265,16 +257,12 @@ public final class BlockMinerMod implements IBlockMinerMod, ClientModInitializer
     static {
         final String[] immutableNames, immutableDescriptors;
         try {
-            ModConstants modConstantsEmptyImpl = Constant.factory.ofEmptyInterfaceImplInstance(
-                    MethodHandles.lookup(),
-                    ModConstants.class
-            );
             final String[][] immutableNamesAndDescriptors = JavaHelper.getNamesAndDescriptors(
                     MethodHandles.lookup(),
-                    (Supplier<DynamicConstant<BaseConfig>> & Serializable) modConstantsEmptyImpl::config,
-                    (Supplier<TaskManager> & Serializable) modConstantsEmptyImpl::taskManager,
-                    (Supplier<BlockBreakUtils> & Serializable) modConstantsEmptyImpl::blockBreakUtils,
-                    (Supplier<RotationUtils> & Serializable) modConstantsEmptyImpl::rotationUtils
+                    (Function<ModConstants, DynamicConstant<BaseConfig>> & Serializable) ModConstants::config,
+                    (Function<ModConstants, TaskManager> & Serializable) ModConstants::taskManager,
+                    (Function<ModConstants, BlockBreakUtils> & Serializable) ModConstants::blockBreakUtils,
+                    (Function<ModConstants, RotationUtils> & Serializable) ModConstants::rotationUtils
             );
             immutableNames = immutableNamesAndDescriptors[0];
             immutableDescriptors = immutableNamesAndDescriptors[1];

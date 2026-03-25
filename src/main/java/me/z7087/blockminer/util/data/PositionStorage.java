@@ -11,7 +11,7 @@ import org.jetbrains.annotations.NotNull;
 import java.io.Serializable;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
-import java.util.function.Supplier;
+import java.util.function.Function;
 
 public abstract class PositionStorage implements LongIterable {
     private PositionStorage() {}
@@ -20,13 +20,9 @@ public abstract class PositionStorage implements LongIterable {
     static {
         final String[] immutableNames, immutableDescriptors;
         try {
-            PositionStorage positionStorageEmptyImpl = Constant.factory.ofEmptyAbstractImplInstance(
-                    MethodHandles.lookup(),
-                    PositionStorage.class
-            );
             final String[][] immutableNamesAndDescriptors = JavaHelper.getNamesAndDescriptors(
                     MethodHandles.lookup(),
-                    (Supplier<LongLinkedOpenHashSet> & Serializable) positionStorageEmptyImpl::positionSet
+                    (Function<PositionStorage, LongLinkedOpenHashSet> & Serializable) PositionStorage::positionSet
             );
             immutableNames = immutableNamesAndDescriptors[0];
             immutableDescriptors = immutableNamesAndDescriptors[1];

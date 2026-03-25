@@ -7,8 +7,8 @@ import java.io.Serializable;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.util.Collection;
+import java.util.function.Function;
 import java.util.function.IntFunction;
-import java.util.function.Supplier;
 
 public abstract class UniqueObjectCollection<T> {
     protected UniqueObjectCollection() {
@@ -19,15 +19,11 @@ public abstract class UniqueObjectCollection<T> {
     static {
         final String[] immutableNames, immutableDescriptors;
         try {
-            UniqueObjectCollection<?> uniqueObjectCollectionEmptyImpl = Constant.factory.ofEmptyAbstractImplInstance(
-                    MethodHandles.lookup(),
-                    UniqueObjectCollection.class
-            );
             final String[][] immutableNamesAndDescriptors = JavaHelper.getNamesAndDescriptors(
                     MethodHandles.lookup(),
-                    (Supplier<String> & Serializable) uniqueObjectCollectionEmptyImpl::name,
-                    (Supplier<Object[]> & Serializable) uniqueObjectCollectionEmptyImpl::originalObjects,
-                    (Supplier<UniqueObject<?>[]> & Serializable) uniqueObjectCollectionEmptyImpl::uniqueObjects
+                    (Function<UniqueObjectCollection<?>, String> & Serializable) UniqueObjectCollection::name,
+                    (Function<UniqueObjectCollection<?>, Object[]> & Serializable) UniqueObjectCollection::originalObjects,
+                    (Function<UniqueObjectCollection<?>, UniqueObject<?>[]> & Serializable) UniqueObjectCollection::uniqueObjects
             );
             immutableNames = immutableNamesAndDescriptors[0];
             immutableDescriptors = immutableNamesAndDescriptors[1];

@@ -13,7 +13,7 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayDeque;
 import java.util.Deque;
-import java.util.function.BooleanSupplier;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 public abstract class RotationUtils {
@@ -23,17 +23,13 @@ public abstract class RotationUtils {
     static {
         final String[] immutableNames, immutableDescriptors, mutableNames, mutableDescriptors;
         try {
-            RotationUtils rotationUtilsEmptyImpl = Constant.factory.ofEmptyAbstractImplInstance(
-                    MethodHandles.lookup(),
-                    RotationUtils.class
-            );
             final String[][] immutableNamesAndDescriptors = JavaHelper.getNamesAndDescriptors(
                     MethodHandles.lookup(),
-                    (Supplier<Deque<Rotation>> & Serializable) rotationUtilsEmptyImpl::rotations
+                    (Function<RotationUtils, Deque<Rotation>> & Serializable) RotationUtils::rotations
             );
             final String[][] mutableNamesAndDescriptors = JavaHelper.getNamesAndDescriptors(
                     MethodHandles.lookup(),
-                    (BooleanSupplier & Serializable) rotationUtilsEmptyImpl::keepRotationToNextTick
+                    (Function<RotationUtils, Boolean> & Serializable) RotationUtils::keepRotationToNextTick
             );
             immutableNames = immutableNamesAndDescriptors[0];
             immutableDescriptors = immutableNamesAndDescriptors[1];
