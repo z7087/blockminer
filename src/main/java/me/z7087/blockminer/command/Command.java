@@ -182,12 +182,6 @@ public final class Command {
                         )
                 ).then(
                         boolConfigArgBuilder(
-                                "headless-piston-mode",
-                                () -> BlockMinerMod.getInstance().getConfig().isHeadlessPistonMode(),
-                                (value) -> BlockMinerMod.getInstance().getConfig().setHeadlessPistonMode(value)
-                        )
-                ).then(
-                        boolConfigArgBuilder(
                                 "blink-during-tasks-tick",
                                 () -> BlockMinerMod.getInstance().getConfig().isBlinkDuringTasksTick(),
                                 (value) -> BlockMinerMod.getInstance().getConfig().setBlinkDuringTasksTick(value)
