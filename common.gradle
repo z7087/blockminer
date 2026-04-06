@@ -1,5 +1,5 @@
 apply plugin: 'maven-publish'
-apply plugin: 'fabric-loom'
+apply plugin: 'net.fabricmc.fabric-loom-remap'
 apply plugin: 'com.replaymod.preprocess'
 
 int mcVersion = project.mcVersion
