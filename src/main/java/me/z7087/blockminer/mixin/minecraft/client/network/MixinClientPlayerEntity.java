@@ -26,14 +26,26 @@ public abstract class MixinClientPlayerEntity {
     //$$ )
     //#endif
     private float onGetYaw(ClientPlayerEntity player) {
-        Rotation rotation = BlockMinerMod.getInstance().getRotationUtils().getRotation();
-        if (rotation.hasYaw())
-            return rotation.getYaw();
-        //#if MC >= 11700
-        return player.getYaw();
-        //#else
-        //$$ return player.yaw;
-        //#endif
+        if (!BlockMinerMod.getInstance().getTaskManager().isEnabled()) {
+            //#if MC >= 11700
+            return player.getYaw();
+            //#else
+            //$$ return player.yaw;
+            //#endif
+        }
+        final Rotation rotation = BlockMinerMod.getInstance().getRotationUtils().getRotation();
+        final float yaw;
+        if (rotation.hasYaw()) {
+            yaw = rotation.getYaw();
+        } else {
+            //#if MC >= 11700
+            yaw = player.getYaw();
+            //#else
+            //$$ yaw = player.yaw;
+            //#endif
+        }
+        BlockMinerMod.getInstance().getUncertainManager().onYawDirectionUpdate(yaw);
+        return yaw;
     }
 
     //#if MC >= 11700
@@ -53,8 +65,10 @@ public abstract class MixinClientPlayerEntity {
     //$$ )
     //#endif
     private float onGetPitch(ClientPlayerEntity player) {
-        Rotation rotation = BlockMinerMod.getInstance().getRotationUtils().getRotation();
-        if (rotation.hasPitch())
+        final Rotation rotation;
+        if (BlockMinerMod.getInstance().getTaskManager().isEnabled()
+                && (rotation = BlockMinerMod.getInstance().getRotationUtils().getRotation()).hasPitch()
+        )
             return rotation.getPitch();
         //#if MC >= 11700
         return player.getPitch();

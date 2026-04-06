@@ -96,9 +96,9 @@ public abstract class TaskManager {
     abstract PositionStorage positionsToClear();
 
     public void tick() {
-        BlockMinerMod.getInstance().getRotationUtils().resetRotationIfNoKeepRotation();
         if (!isEnabled())
             return;
+        BlockMinerMod.getInstance().getRotationUtils().resetRotationIfNoKeepRotation();
         final ClientPlayerEntity player = BlockMinerMod.getInstance().ticklyUpdateConstants().player();
         if (player == null) {
             return;
@@ -116,6 +116,7 @@ public abstract class TaskManager {
                 return;
             }
         }
+        BlockMinerMod.getInstance().getUncertainManager().tickAndCheck();
         final ClientConnection connection = player.networkHandler.getConnection();
         final PositionStorage positionsToClear = positionsToClear();
         final boolean startedBlinking = connection != null
@@ -262,6 +263,7 @@ public abstract class TaskManager {
                 this.setPrevWorldRef(new WeakReference<>(world));
             }
         }
+        BlockMinerMod.getInstance().getUncertainManager().startup();
     }
 
     private void onDisable() {
@@ -269,6 +271,7 @@ public abstract class TaskManager {
         //this.prevWorldRef = null;
         clearTasks();
         positionsToClear().clear();
+        BlockMinerMod.getInstance().getUncertainManager().reset();
         BlockMinerMod.getInstance().getRotationUtils().forceClearRotations();
         BlockMinerMod.getInstance().getBlockBreakUtils().setBreaking(false);
     }

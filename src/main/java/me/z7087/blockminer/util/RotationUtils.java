@@ -266,6 +266,7 @@ public abstract class RotationUtils {
     public void forceClearRotations() {
         rotations().clear();
         rotations().add(Rotation.NONE);
+        keepRotationToNextTick(false);
     }
 
     public void resetRotationIfNoKeepRotation() {

@@ -1,6 +1,7 @@
 package me.z7087.blockminer.task;
 
 import me.z7087.blockminer.BlockMinerMod;
+import me.z7087.blockminer.mixin.minecraft.client.network.ClientPlayerEntityAccessor;
 import me.z7087.blockminer.mixin.minecraft.client.network.ClientPlayerInteractionManagerAccessor;
 import me.z7087.blockminer.util.BlockUtils;
 import me.z7087.blockminer.util.InventoryUtils;
@@ -37,6 +38,7 @@ public class Task implements Comparable<Task> {
     private int pickaxeIndex;
     private BlockBreakStructureFull structure;
     private int waitTicks = 0;
+    private int uncertainManagerKeepTicks = 0;
     private float blockBreakingDelta;
     private boolean isMining = false;
     public TaskState state = TaskState.Start;
@@ -47,6 +49,12 @@ public class Task implements Comparable<Task> {
 
     private int getWaitTicksAfterDecrement() {
         return --waitTicks;
+    }
+
+    private int getWaitTicksAfterDecrementIfPositive() {
+        if (waitTicks > 0)
+            return --waitTicks;
+        return 0;
     }
 
     private void stopWaiting() {
@@ -61,6 +69,10 @@ public class Task implements Comparable<Task> {
             throw new IllegalStateException("still waiting");
         }
         this.waitTicks = ticks + BlockMinerMod.getInstance().getConfig().getPingSpikeThreshold();
+    }
+
+    private void setUncertainManagerKeepTicks(int ticks) {
+        this.uncertainManagerKeepTicks = ticks + BlockMinerMod.getInstance().getConfig().getPingSpikeThreshold();
     }
 
     public boolean tick(PositionStorage positionsToClear) {
@@ -237,7 +249,9 @@ public class Task implements Comparable<Task> {
                             assertTrue(rotationUtils.trySetRotation(yaw, pitch));
                             rotationUtils.markKeepRotation();
                             state = TaskState.WaitForPistonPlaceRotate;
-                            setWaitTicks(1);
+                            setUncertainManagerKeepTicks(1);
+                            ((ClientPlayerEntityAccessor) player).invokeSendMovementPackets();
+                            return true;
                         }
                         return false;
                     }
@@ -248,7 +262,7 @@ public class Task implements Comparable<Task> {
     }
 
     private boolean waitForPistonPlaceRotate() {
-        if (getWaitTicksAfterDecrement() > 0) {
+        if (!BlockMinerMod.getInstance().getUncertainManager().isYawDirectionKeeping(uncertainManagerKeepTicks)) {
             BlockMinerMod.getInstance().getRotationUtils().markKeepRotation();
             return false;
         }

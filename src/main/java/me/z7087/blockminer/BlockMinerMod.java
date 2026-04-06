@@ -8,6 +8,7 @@ import me.z7087.blockminer.task.TaskManager;
 import me.z7087.blockminer.util.BlockBreakUtils;
 import me.z7087.blockminer.util.InventoryUtils;
 import me.z7087.blockminer.util.RotationUtils;
+import me.z7087.blockminer.util.UncertainManager;
 import me.z7087.blockminer.util.finder.BlockFinder;
 import me.z7087.blockminer.util.finder.NoHorizontalBlockFinder;
 import me.z7087.blockminer.util.finder.NoHorizontalSimpleBlockFinder;
@@ -40,6 +41,8 @@ public final class BlockMinerMod implements IBlockMinerMod, ClientModInitializer
         BlockBreakUtils blockBreakUtils();
 
         RotationUtils rotationUtils();
+
+        UncertainManager uncertainManager();
     }
     public static abstract class StableConstants {
         private StableConstants() {}
@@ -262,7 +265,8 @@ public final class BlockMinerMod implements IBlockMinerMod, ClientModInitializer
                     (Function<ModConstants, DynamicConstant<BaseConfig>> & Serializable) ModConstants::config,
                     (Function<ModConstants, TaskManager> & Serializable) ModConstants::taskManager,
                     (Function<ModConstants, BlockBreakUtils> & Serializable) ModConstants::blockBreakUtils,
-                    (Function<ModConstants, RotationUtils> & Serializable) ModConstants::rotationUtils
+                    (Function<ModConstants, RotationUtils> & Serializable) ModConstants::rotationUtils,
+                    (Function<ModConstants, UncertainManager> & Serializable) ModConstants::uncertainManager
             );
             immutableNames = immutableNamesAndDescriptors[0];
             immutableDescriptors = immutableNamesAndDescriptors[1];
@@ -288,7 +292,8 @@ public final class BlockMinerMod implements IBlockMinerMod, ClientModInitializer
                     Constant.factory.ofMutable(Config.createDefaultConfig()),
                     TaskManager.createInstance(),
                     BlockBreakUtils.createInstance(),
-                    RotationUtils.createInstance()
+                    RotationUtils.createInstance(),
+                    new UncertainManager()
             ));
         } catch (Throwable e) {
             throw new RuntimeException(e);
@@ -375,6 +380,10 @@ public final class BlockMinerMod implements IBlockMinerMod, ClientModInitializer
 
     public RotationUtils getRotationUtils() {
         return MOD_CONSTANTS.orElseThrow().rotationUtils();
+    }
+
+    public UncertainManager getUncertainManager() {
+        return MOD_CONSTANTS.orElseThrow().uncertainManager();
     }
 
     private static BlockMinerMod getInstanceOrNull() {
