@@ -46,7 +46,8 @@ def versions = List.of(
         "1.21.6",
         "1.21.8",
         "1.21.10",
-        "1.21.11"
+        "1.21.11",
+        "26.1.2"
 )
 for (String version : versions) {
     include(":$version")

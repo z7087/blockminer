@@ -3,6 +3,7 @@ apply plugin: 'net.fabricmc.fabric-loom-remap'
 apply plugin: 'com.replaymod.preprocess'
 
 int mcVersion = project.mcVersion
+boolean unobfuscated = mcVersion >= 260000 || project.hasProperty("unobfuscated")
 
 repositories {
     maven {
@@ -11,18 +12,44 @@ repositories {
     maven {
         url 'https://maven.fallenbreath.me/releases'
     }
+    if (unobfuscated) {
+        maven {
+            url 'https://repo.codemc.io/repository/relativitymc'
+        }
+    }
 }
 
 // https://github.com/FabricMC/fabric-loader/issues/783
 configurations {
-    modRuntimeOnly.exclude group: 'net.fabricmc', module: 'fabric-loader'
+    if (unobfuscated) {
+        //runtimeOnly.exclude group: 'net.fabricmc', module: 'fabric-loader'
+        modRuntimeOnly.exclude group: 'net.fabricmc', module: 'fabric-loader'
+    } else {
+        modRuntimeOnly.exclude group: 'net.fabricmc', module: 'fabric-loader'
+    }
 }
 
 dependencies {
     // loom
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
-    mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
-    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    if (unobfuscated) {
+        mappings "org.relativitymc:modern-yarn:${project.yarn_mappings}:v2"
+    } else {
+        mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
+    }
+    def autoImplementation = { Object... args ->
+        if (unobfuscated) {
+//            modCompileOnly(*args)
+//            modRuntimeOnly(*args)
+//            runtimeOnly(*args)
+//            implementation(*args)
+            modImplementation(*args)
+            // runclient报错。
+        } else {
+            modImplementation(*args)
+        }
+    }
+    autoImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
 
     // runtime mods
 //	if (mcVersion < 11904) {
@@ -31,12 +58,18 @@ dependencies {
 
     // dependencies
     Set<String> apiModules = [
-            mcVersion >= 1_19_00 ? "fabric-command-api-v2" : "fabric-command-api-v1",
-            "fabric-resource-loader-v0"
+            mcVersion >= 1_19_00 ? "fabric-command-api-v2" : "fabric-command-api-v1"
     ]
+    if (mcVersion >= 1_21_09) {
+        apiModules.add("fabric-resource-loader-v1")
+    } else {
+        apiModules.add("fabric-resource-loader-v0")
+    }
     // Add each module as a dependency
     apiModules.forEach {
-        modImplementation(fabricApi.module(it, project.fabric_api_version))
+        if (it.length() != 0) {
+            autoImplementation fabricApi.module(it, project.fabric_api_version)
+        }
     }
     include(implementation("com.github.z7087:final2constant:fa7a75baee"))
 //	include(modImplementation(fabricApi.module("fabric-resource-loader-v0", project.fabric_api_version)))
@@ -46,7 +79,9 @@ dependencies {
 
 JavaVersion MIN_JAVA_COMPATIBILITY = JavaVersion.VERSION_1_8
 JavaVersion JAVA_COMPATIBILITY
-if (mcVersion >= 12005) {
+if (mcVersion >= 260000) {
+    JAVA_COMPATIBILITY = JavaVersion.VERSION_25
+} else if (mcVersion >= 12005) {
     JAVA_COMPATIBILITY = JavaVersion.VERSION_21
 } else if (mcVersion >= 11800) {
     JAVA_COMPATIBILITY = JavaVersion.VERSION_17
@@ -58,6 +93,17 @@ if (mcVersion >= 12005) {
 JavaVersion MIXIN_COMPATIBILITY_LEVEL = JAVA_COMPATIBILITY
 
 loom {
+    runs {
+        client {
+//            def m = client.getClass().getMethods()
+//            for (java.lang.reflect.Method i : m) {
+//                println("i: ${i.getName()} ${i.getParameterCount()}")
+//            }
+//            print("")
+            //conventionMapping
+            //namespace = 'official'
+        }
+    }
     def commonVmArgs = ['-Dmixin.debug.export=true', '-Dmixin.debug.countInjections=true']
     commonVmArgs += '-XX:+UnlockExperimentalVMOptions'
     commonVmArgs += '-XX:+TrustFinalNonStaticFields'
@@ -86,6 +132,11 @@ loom {
         ideConfigGenerated = true
         runDir '../../run'
         vmArgs commonVmArgs
+    }
+    if (unobfuscated) {
+        def minecraftVersion = project.minecraft_version
+        useIntermediateMappings = true
+        intermediaryUrl = "https://repo.codemc.io/repository/relativitymc/org/relativitymc/intermediary/$minecraftVersion/intermediary-$minecraftVersion-v2.jar"
     }
 }
 
