@@ -127,7 +127,7 @@ public abstract class TaskManager {
             final Iterator<Task> taskIterator = taskQueue().iterator();
             while (taskIterator.hasNext()) {
                 final Task task = taskIterator.next();
-                final boolean ignoreOtherTasks = task.tick(positionsToClear);
+                final boolean ignoreOtherTasks = task.tick();
                 if (task.state == TaskState.Finished) {
                     taskIterator.remove();
                     posSet().remove(task.targetPos);

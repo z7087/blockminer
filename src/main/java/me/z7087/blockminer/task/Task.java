@@ -8,7 +8,6 @@ import me.z7087.blockminer.util.InventoryUtils;
 import me.z7087.blockminer.util.PlayerUtils;
 import me.z7087.blockminer.util.RotationUtils;
 import me.z7087.blockminer.util.data.BlockBreakStructureFull;
-import me.z7087.blockminer.util.data.PositionStorage;
 import me.z7087.blockminer.api.enums.PowerBlockType;
 import me.z7087.blockminer.api.enums.TaskState;
 import me.z7087.blockminer.util.finder.BlockFinder;
@@ -75,7 +74,7 @@ public class Task implements Comparable<Task> {
         this.uncertainManagerKeepTicks = ticks + BlockMinerMod.getInstance().getConfig().getPingSpikeThreshold();
     }
 
-    public boolean tick(PositionStorage positionsToClear) {
+    public boolean tick() {
         //noinspection resource
         if (BlockMinerMod.getInstance().ticklyUpdateConstants().player() == null
                 || BlockMinerMod.getInstance().ticklyUpdateConstants().world() == null) {
@@ -86,7 +85,7 @@ public class Task implements Comparable<Task> {
         while (true) {
             switch (state) {
                 case Start: {
-                    if (start(positionsToClear)) {
+                    if (start()) {
                         continue;
                     }
                     break loop;
@@ -121,7 +120,7 @@ public class Task implements Comparable<Task> {
                     break loop;
                 }
                 case Execute: {
-                    execute(positionsToClear);
+                    execute();
                     break loop;
                 }
                 case WaitForPistonClear: {
@@ -131,7 +130,7 @@ public class Task implements Comparable<Task> {
                     break loop;
                 }
                 case ClearPiston: {
-                    clearPiston(positionsToClear);
+                    clearPiston();
                     break loop;
                 }
                 case Finished:
@@ -143,7 +142,7 @@ public class Task implements Comparable<Task> {
         return false;
     }
 
-    private boolean start(PositionStorage positionsToClear) {
+    private boolean start() {
         final ClientWorld world;
         final ClientPlayerEntity player;
         final PlayerInventory inventory;
@@ -201,7 +200,7 @@ public class Task implements Comparable<Task> {
                     // 当依赖方块是目标方块时，无法创建无头活塞
                     && (!BlockMinerMod.getInstance().getConfig().isHeadlessPistonMode() || !structure.getDependBlockPos().equals(targetPos))
                     // 保证依赖方块不会被其他task意外清除
-                    && !positionsToClear.hasPos(structure.getDependBlockPos())
+                    && !BlockMinerMod.getInstance().getTaskManager().positionsToClear().hasPos(structure.getDependBlockPos())
             ) {
                 this.structure = structure;
                 // 朝上下的活塞的朝向可以立即到位，其他方向的不行
@@ -560,7 +559,7 @@ public class Task implements Comparable<Task> {
         return true;
     }
 
-    private void execute(PositionStorage positionsToClear) {
+    private void execute() {
         final ClientWorld world;
         final ClientPlayerEntity player;
         final PlayerInventory inventory;
@@ -763,7 +762,7 @@ public class Task implements Comparable<Task> {
                     }
                 }
 
-                positionsToClear.registerPos(dependBlockPos);
+                BlockMinerMod.getInstance().getTaskManager().positionsToClear().registerPos(dependBlockPos);
             }
             // 由于活塞需要等到服务端运行下一tick破掉目标方块，等待
             state = TaskState.WaitForPistonClear;
@@ -818,7 +817,7 @@ public class Task implements Comparable<Task> {
         }
     }
 
-    private void clearPiston(PositionStorage positionStorage) {
+    private void clearPiston() {
         final ClientWorld world;
         {
             BlockMinerMod.TicklyUpdateConstants ticklyUpdateConstants = BlockMinerMod.getInstance().ticklyUpdateConstants();
@@ -828,7 +827,7 @@ public class Task implements Comparable<Task> {
         final BlockPos pistonPos = structure.getPistonPos();
         final BlockState pistonPosState = world.getBlockState(pistonPos);
         if (pistonPosState.getBlock() instanceof PistonBlock && pistonPosState.get(Properties.FACING) != structure.getPistonOffset().getOpposite()) {
-            positionStorage.registerPos(pistonPos);
+            BlockMinerMod.getInstance().getTaskManager().positionsToClear().registerPos(pistonPos);
         }
         state = TaskState.Finished;
     }
