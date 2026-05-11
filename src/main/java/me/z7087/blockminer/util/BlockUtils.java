@@ -21,7 +21,11 @@ public final class BlockUtils {
         return Math.abs(pos3.getX()) + Math.abs(pos3.getY()) + Math.abs(pos3.getZ());
     }
 
-    public static ActionResult interactBlock(ClientPlayerInteractionManager interactionManager, ClientPlayerEntity player, ClientWorld ignoredWorld, Hand hand, BlockHitResult hitResult) {
+    public static ActionResult interactBlock(ClientPlayerInteractionManager interactionManager,
+                                             ClientPlayerEntity player,
+                                             ClientWorld ignoredWorld,
+                                             Hand hand,
+                                             BlockHitResult hitResult) {
         //#if MC >= 11900
         return interactionManager.interactBlock(player, hand, hitResult);
         //#else

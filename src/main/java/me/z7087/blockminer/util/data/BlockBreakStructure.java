@@ -191,6 +191,23 @@ public final class BlockBreakStructure implements Comparable<BlockBreakStructure
                             )
                     )
                     ) {
+                        // 判断活塞和活塞头周边是否有朝向此活塞的活塞
+                        for (Direction directionsAroundPiston : BlockFinder.DIRECTIONS) {
+                            final BlockPos mayBeOtherPistonPos = pistonPos.offset(directionsAroundPiston);
+                            if (world.getBlockState(mayBeOtherPistonPos).getBlock() instanceof PistonBlock) {
+                                if (world.getBlockState(mayBeOtherPistonPos).get(Properties.FACING) == directionsAroundPiston.getOpposite()) {
+                                    return false;
+                                }
+                            }
+                        }
+                        for (Direction directionsAroundPistonHead : BlockFinder.DIRECTIONS) {
+                            final BlockPos mayBeOtherPistonPos = pistonHeadPos.offset(directionsAroundPistonHead);
+                            if (world.getBlockState(mayBeOtherPistonPos).getBlock() instanceof PistonBlock) {
+                                if (world.getBlockState(mayBeOtherPistonPos).get(Properties.FACING) == directionsAroundPistonHead.getOpposite()) {
+                                    return false;
+                                }
+                            }
+                        }
                         // 判断是否有其他能源方块正在激活附着方块
                         if (world.getReceivedStrongRedstonePower(dependBlockPos) == 0) {
                             // 判断能源方块强充能的位置是否有固体方块，如果有，判断能源方块是否能通过此方块充能到其他红石火把和活塞

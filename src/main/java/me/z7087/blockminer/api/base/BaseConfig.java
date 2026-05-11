@@ -1,6 +1,7 @@
 package me.z7087.blockminer.api.base;
 
 import me.z7087.blockminer.api.enums.DistanceCalculationMode;
+import me.z7087.blockminer.api.enums.EasyPlaceProtocol;
 import me.z7087.blockminer.api.enums.PowerBlockType;
 import me.z7087.blockminer.api.enums.SearchMode;
 import me.z7087.final2constant.DynamicConstant;
@@ -19,6 +20,7 @@ public abstract class BaseConfig {
     protected abstract DynamicConstant<PowerBlockType> powerBlockUsage();
     protected abstract DynamicConstant<DistanceCalculationMode> distanceCalculationMode();
     protected abstract DynamicConstant<SearchMode> searchMode();
+    protected abstract DynamicConstant<EasyPlaceProtocol> easyPlaceProtocol();
 
     public abstract Set<Block> blockWhitelist();
 
@@ -130,5 +132,14 @@ public abstract class BaseConfig {
     public void setSearchMode(SearchMode value) {
         searchMode().set(value);
         searchMode().sync();
+    }
+
+    public EasyPlaceProtocol getEasyPlaceProtocol() {
+        return easyPlaceProtocol().orElseThrow();
+    }
+
+    public void setEasyPlaceProtocol(EasyPlaceProtocol value) {
+        easyPlaceProtocol().set(value);
+        easyPlaceProtocol().sync();
     }
 }

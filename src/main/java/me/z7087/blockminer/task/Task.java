@@ -1,12 +1,10 @@
 package me.z7087.blockminer.task;
 
 import me.z7087.blockminer.BlockMinerMod;
+import me.z7087.blockminer.api.enums.EasyPlaceProtocol;
 import me.z7087.blockminer.mixin.minecraft.client.network.ClientPlayerEntityAccessor;
 import me.z7087.blockminer.mixin.minecraft.client.network.ClientPlayerInteractionManagerAccessor;
-import me.z7087.blockminer.util.BlockUtils;
-import me.z7087.blockminer.util.InventoryUtils;
-import me.z7087.blockminer.util.PlayerUtils;
-import me.z7087.blockminer.util.RotationUtils;
+import me.z7087.blockminer.util.*;
 import me.z7087.blockminer.util.data.BlockBreakStructureFull;
 import me.z7087.blockminer.api.enums.PowerBlockType;
 import me.z7087.blockminer.api.enums.TaskState;
@@ -203,56 +201,62 @@ public class Task implements Comparable<Task> {
                     && !BlockMinerMod.getInstance().getTaskManager().positionsToClear().hasPos(structure.getDependBlockPos())
             ) {
                 this.structure = structure;
-                // 朝上下的活塞的朝向可以立即到位，其他方向的不行
-                switch (structure.getPistonFace()) {
-                    case UP:
-                    case DOWN: {
-                        // 如果活塞朝上，面向下，否则面向上
-                        float pitch = structure.getPistonFace() == Direction.UP ? 90F : -90F;
-                        if (rotationUtils.canSetPitch(pitch)) {
-                            assertTrue(rotationUtils.trySetPitch(pitch));
-                            rotationUtils.updateLocation(player);
-                            state = TaskState.PlaceBlocksWithoutChecks;
-                            // 继续循环
-                            return true;
+                if (BlockMinerMod.getInstance().getConfig().getEasyPlaceProtocol() != EasyPlaceProtocol.None) {
+                    // EasyPlace下不需要等yaw延迟 甚至省了uncertain部分 我真的哭死
+                    state = TaskState.PlaceBlocksWithoutChecks;
+                    return true;
+                } else {
+                    // 朝上下的活塞的朝向可以立即到位，其他方向的不行
+                    switch (structure.getPistonFace()) {
+                        case UP:
+                        case DOWN: {
+                            // 如果活塞朝上，面向下，否则面向上
+                            float pitch = structure.getPistonFace() == Direction.UP ? 90F : -90F;
+                            if (rotationUtils.canSetPitch(pitch)) {
+                                assertTrue(rotationUtils.trySetPitch(pitch));
+                                rotationUtils.updateLocation(player);
+                                state = TaskState.PlaceBlocksWithoutChecks;
+                                // 继续循环
+                                return true;
+                            }
+                            return false;
                         }
-                        return false;
-                    }
-                    default: {
-                        float pitch = 0;
-                        float yaw;
-                        // 假定玩家面向正南时 yaw = 0
-                        switch (structure.getPistonFace()) {
-                            case SOUTH: {
-                                // 朝北
-                                yaw = 180F;
-                                break;
+                        default: {
+                            float pitch = 0;
+                            float yaw;
+                            // 假定玩家面向正南时 yaw = 0
+                            switch (structure.getPistonFace()) {
+                                case SOUTH: {
+                                    // 朝北
+                                    yaw = 180F;
+                                    break;
+                                }
+                                case WEST: {
+                                    // 朝东
+                                    yaw = -90F;
+                                    break;
+                                }
+                                case NORTH: {
+                                    // 朝南
+                                    yaw = 0F;
+                                    break;
+                                }
+                                case EAST:
+                                default: {
+                                    // 朝西
+                                    yaw = 90F;
+                                }
                             }
-                            case WEST: {
-                                // 朝东
-                                yaw = -90F;
-                                break;
+                            if (rotationUtils.canSetRotation(yaw, pitch)) {
+                                assertTrue(rotationUtils.trySetRotation(yaw, pitch));
+                                rotationUtils.markKeepRotation();
+                                state = TaskState.WaitForPistonPlaceRotate;
+                                setUncertainManagerKeepTicks(1);
+                                ((ClientPlayerEntityAccessor) player).invokeSendMovementPackets();
+                                return true;
                             }
-                            case NORTH: {
-                                // 朝南
-                                yaw = 0F;
-                                break;
-                            }
-                            case EAST:
-                            default: {
-                                // 朝西
-                                yaw = 90F;
-                            }
+                            return false;
                         }
-                        if (rotationUtils.canSetRotation(yaw, pitch)) {
-                            assertTrue(rotationUtils.trySetRotation(yaw, pitch));
-                            rotationUtils.markKeepRotation();
-                            state = TaskState.WaitForPistonPlaceRotate;
-                            setUncertainManagerKeepTicks(1);
-                            ((ClientPlayerEntityAccessor) player).invokeSendMovementPackets();
-                            return true;
-                        }
-                        return false;
                     }
                 }
             }
@@ -300,6 +304,10 @@ public class Task implements Comparable<Task> {
             retry();
             return false;
         }
+        if (!structure.testBeforePlace(world, targetPos, dependBlockIndex != -1)) {
+            retry();
+            return false;
+        }
         if (!BlockUtils.playerCanTouchServerside(player, structure.getPistonPos(), 1, false)
                 || !BlockUtils.playerCanTouchServerside(player, structure.getPowerBlockPos(), 1, false)
                 || !BlockUtils.playerCanTouchServerside(player, structure.getDependBlockPos(), 1, false)) {
@@ -338,23 +346,61 @@ public class Task implements Comparable<Task> {
         }
         {
             // 凭空放置
-            ActionResult result = InventoryUtils.moveToOffHandDuring(player,
-                    pistonIndex,
-                    () -> rotationUtils.useServerSideRotationDuring(
-                            player,
-                            () -> BlockUtils.interactBlock(interactionManager,
-                                    player,
-                                    world,
-                                    Hand.OFF_HAND,
-                                    new BlockHitResult(
-                                            Vec3d.of(structure.getPistonPos()),
-                                            Direction.DOWN,
-                                            structure.getPistonPos(),
-                                            false
-                                    )
-                            )
-                    )
-            );
+            final ActionResult result;
+            final EasyPlaceProtocol easyPlaceProtocol = BlockMinerMod.getInstance().getConfig().getEasyPlaceProtocol();
+            if (easyPlaceProtocol == EasyPlaceProtocol.V3) {
+                result = InventoryUtils.moveToOffHandDuring(player,
+                        pistonIndex,
+                        () -> EasyPlaceUtils.placePistonV3(
+                                interactionManager,
+                                player,
+                                world,
+                                Hand.OFF_HAND,
+                                new BlockHitResult(
+                                        Vec3d.of(structure.getPistonPos()),
+                                        Direction.DOWN,
+                                        structure.getPistonPos(),
+                                        false
+                                ),
+                                structure.getPistonFace()
+                        )
+                );
+            } else if (easyPlaceProtocol == EasyPlaceProtocol.V2) {
+                result = InventoryUtils.moveToOffHandDuring(player,
+                        pistonIndex,
+                        () -> EasyPlaceUtils.placePistonCarpetExtra(
+                                interactionManager,
+                                player,
+                                world,
+                                Hand.OFF_HAND,
+                                new BlockHitResult(
+                                        Vec3d.of(structure.getPistonPos()),
+                                        Direction.DOWN,
+                                        structure.getPistonPos(),
+                                        false
+                                ),
+                                structure.getPistonFace()
+                        )
+                );
+            } else {
+                result = InventoryUtils.moveToOffHandDuring(player,
+                        pistonIndex,
+                        () -> rotationUtils.useServerSideRotationDuring(
+                                player,
+                                () -> BlockUtils.interactBlock(interactionManager,
+                                        player,
+                                        world,
+                                        Hand.OFF_HAND,
+                                        new BlockHitResult(
+                                                Vec3d.of(structure.getPistonPos()),
+                                                Direction.DOWN,
+                                                structure.getPistonPos(),
+                                                false
+                                        )
+                                )
+                        )
+                );
+            }
             // 放不了，怎么回事呢？重来一遍
             if (!result.isAccepted()) {
                 retry();
@@ -465,70 +511,78 @@ public class Task implements Comparable<Task> {
             InventoryUtils.setSelectedSlot(inventory, pickaxeIndex);
             ((ClientPlayerInteractionManagerAccessor) interactionManager).invokeSyncSelectedSlot();
         }
-        Direction pistonToTargetBlockFace = null;
-        for (Direction face : BlockFinder.DIRECTIONS) {
-            if (structure.getPistonPos().offset(face).equals(targetPos)) {
-                pistonToTargetBlockFace = face;
-                break;
-            }
-        }
-        assertTrue(pistonToTargetBlockFace != null);
-        switch (pistonToTargetBlockFace) {
-            case UP:
-            case DOWN: {
-                if (rotationUtils.trySetPitch(pistonToTargetBlockFace == Direction.UP ? 90F : -90F)) {
-                    break;
-                }
-                return;
-            }
-            default: {
-                float pitch = 0;
-                float yaw;
-                // 假定玩家面向正南时 yaw = 0
-                switch (pistonToTargetBlockFace) {
-                    case SOUTH: {
-                        // 朝北
-                        yaw = 180F;
-                        break;
-                    }
-                    case WEST: {
-                        // 朝东
-                        yaw = -90F;
-                        break;
-                    }
-                    case NORTH: {
-                        // 朝南
-                        yaw = 0F;
-                        break;
-                    }
-                    case EAST:
-                    default: {
-                        // 朝西
-                        yaw = 90F;
-                    }
-                }
-                if (rotationUtils.trySetRotation(yaw, pitch)) {
-                    break;
-                }
-                return;
-            }
-        }
+        Direction pistonToTargetBlockFace = structure.getPistonOffset().getOpposite();
+
+        boolean startBreakPistonLater = false;
         blockBreakingDelta = InventoryUtils.calcBlockBreakingDelta(player, Blocks.PISTON.getDefaultState(), inventory.getSelectedStack());
         if (blockBreakingDelta < 1) {
             if (blockBreakingDelta < 0.7 && redstoneTorchIndex != -1) {
                 // 挖得太慢了，破不了，回去重试
-                retry();
+                // 这里真的要重试吗？别的任务占用挖掘和挖不到方块的情况下都能等 这里不能等吗？先注释看看
+                //retry();
                 return;
             }
-            if (BlockUtils.playerCanTouchServerside(player, structure.getPistonPos(), 1, true) && !BlockMinerMod.getInstance().getBlockBreakUtils().isModBreakingBlock()) {
-                BlockMinerMod.getInstance().getBlockBreakUtils().setBreaking(true);
-                isMining = true;
-                interactionManager.cancelBlockBreaking();
-                interactionManager.attackBlock(structure.getPistonPos(), Direction.DOWN);
+            if (blockBreakingDelta >= 0.7) {
+                // 延后挖掘到实际放置活塞的那一刻...?
+                // 但是如果一直碰不到还可能会导致视角卡在这里 麻烦欸
+                // 这块多做个用处不大的检查得了
+                if (BlockMinerMod.getInstance().getConfig().getEasyPlaceProtocol() == EasyPlaceProtocol.None && !BlockUtils.playerCanTouchServerside(player, structure.getPistonPos(), 1, true)) {
+                    return;
+                }
+            } else if (BlockUtils.playerCanTouchServerside(player, structure.getPistonPos(), 1, true) && !BlockMinerMod.getInstance().getBlockBreakUtils().isModBreakingBlock()) {
+                startBreakPistonLater = true;
             } else {
                 // 有别的任务在占用挖掘或者挖不到方块，一会再检查一遍
                 return;
             }
+        }
+        if (BlockMinerMod.getInstance().getConfig().getEasyPlaceProtocol() == EasyPlaceProtocol.None) {
+            switch (pistonToTargetBlockFace) {
+                case UP:
+                case DOWN: {
+                    if (rotationUtils.trySetPitch(pistonToTargetBlockFace == Direction.UP ? 90F : -90F)) {
+                        break;
+                    }
+                    return;
+                }
+                default: {
+                    float pitch = 0;
+                    float yaw;
+                    // 假定玩家面向正南时 yaw = 0
+                    switch (pistonToTargetBlockFace) {
+                        case SOUTH: {
+                            // 朝北
+                            yaw = 180F;
+                            break;
+                        }
+                        case WEST: {
+                            // 朝东
+                            yaw = -90F;
+                            break;
+                        }
+                        case NORTH: {
+                            // 朝南
+                            yaw = 0F;
+                            break;
+                        }
+                        case EAST:
+                        default: {
+                            // 朝西
+                            yaw = 90F;
+                        }
+                    }
+                    if (rotationUtils.trySetRotation(yaw, pitch)) {
+                        break;
+                    }
+                    return;
+                }
+            }
+        }
+        if (startBreakPistonLater) {
+            BlockMinerMod.getInstance().getBlockBreakUtils().setBreaking(true);
+            isMining = true;
+            interactionManager.cancelBlockBreaking();
+            interactionManager.attackBlock(structure.getPistonPos(), Direction.DOWN);
         }
         rotationUtils.markKeepRotation();
         rotationUtils.updateLocation(player);
@@ -548,7 +602,9 @@ public class Task implements Comparable<Task> {
             rotationUtils = BlockMinerMod.getInstance().getRotationUtils();
         }
         if (getWaitTicksAfterDecrement() > 0) {
-            rotationUtils.markKeepRotation();
+            if (BlockMinerMod.getInstance().getConfig().getEasyPlaceProtocol() == EasyPlaceProtocol.None) {
+                rotationUtils.markKeepRotation();
+            }
             if (pickaxeIndex != -1) {
                 InventoryUtils.setSelectedSlot(inventory, pickaxeIndex);
                 ((ClientPlayerInteractionManagerAccessor) interactionManager).invokeSyncSelectedSlot();
@@ -578,24 +634,22 @@ public class Task implements Comparable<Task> {
             InventoryUtils.setSelectedSlot(inventory, pickaxeIndex);
             ((ClientPlayerInteractionManagerAccessor) interactionManager).invokeSyncSelectedSlot();
         }
-        if (!BlockUtils.playerCanTouchServerside(player, structure.getPistonPos(), 1, true)) {
-            rotationUtils.markKeepRotation();
-            // 太远挖不到活塞，延后
-            return;
-        }
-        if (!BlockUtils.playerCanTouchServerside(player, structure.getPowerBlockPos(), 1, true)) {
-            rotationUtils.markKeepRotation();
-            // 太远碰不到能源方块，延后
-            return;
-        }
-        if (redstoneTorchIndex != -1 && BlockMinerMod.getInstance().getConfig().isHeadlessPistonMode() && !BlockUtils.playerCanTouchServerside(player, structure.getDependBlockPos(), 1, false)) {
-            rotationUtils.markKeepRotation();
-            // 如果是无头活塞模式，且此task使用红石火把，且太远碰不到红石火把依附的方块，延后
-            return;
-        }
-        if (leverIndex != -1 && canSwitchHandDenyUse(player, inventory)) {
-            // 如果是拉杆模式且无法使用拉杆，延后
-            rotationUtils.markKeepRotation();
+        // 如果太远挖不到活塞...
+        // 如果太远碰不到能源方块...
+        // 如果是无头活塞模式，且此task使用红石火把，且太远碰不到红石火把依附的方块...
+        // 如果是拉杆模式且无法使用拉杆...
+        // 如果之前能秒破活塞但现在不能 或者别的地方正在挖掘...
+        if (
+                (!BlockUtils.playerCanTouchServerside(player, structure.getPistonPos(), 1, true))
+                        || (!BlockUtils.playerCanTouchServerside(player, structure.getPowerBlockPos(), 1, true))
+                        || (redstoneTorchIndex != -1 && BlockMinerMod.getInstance().getConfig().isHeadlessPistonMode() && !BlockUtils.playerCanTouchServerside(player, structure.getDependBlockPos(), 1, false))
+                        || (leverIndex != -1 && canSwitchHandDenyUse(player, inventory))
+                        || (blockBreakingDelta >= 0.7 && (InventoryUtils.calcBlockBreakingDelta(player, Blocks.PISTON.getDefaultState(), player.getMainHandStack()) < 0.7 || BlockMinerMod.getInstance().getBlockBreakUtils().isModBreakingBlock()))
+        ) {
+            // 延后。
+            if (BlockMinerMod.getInstance().getConfig().getEasyPlaceProtocol() == EasyPlaceProtocol.None) {
+                rotationUtils.markKeepRotation();
+            }
             return;
         }
         if (redstoneTorchIndex != -1) {
@@ -623,16 +677,29 @@ public class Task implements Comparable<Task> {
                 return;
             }
         }
-        if (blockBreakingDelta >= 1) {
+        if (blockBreakingDelta >= 0.7) {
             float blockBreakingDeltaNow = InventoryUtils.calcBlockBreakingDelta(player, Blocks.PISTON.getDefaultState(), player.getMainHandStack());
-            if (blockBreakingDeltaNow < 1) {
-                // 之前能秒破活塞但现在不能了，回去
+            // 这里应该必然是0.7以上 上面检查过了
+            assertTrue(blockBreakingDeltaNow >= 0.7);
+//            if (blockBreakingDeltaNow < 0.7) {
+//                // 之前能秒破活塞但现在不能了，回去
+//                retry();
+//                return;
+//            }
+            interactionManager.attackBlock(structure.getPistonPos(), Direction.DOWN);
+            if (world.getBlockState(structure.getPistonPos()).getBlock() instanceof PistonBlock) {
+                if (blockBreakingDeltaNow < 1) {
+                    ClientPlayerInteractionManagerAccessor interactionManagerAccessor = (ClientPlayerInteractionManagerAccessor) interactionManager;
+                    while (interactionManager.isBreakingBlock() && interactionManagerAccessor.invokeIsCurrentlyBreaking(structure.getPistonPos()))
+                        interactionManager.updateBlockBreakingProgress(structure.getPistonPos(), Direction.DOWN);
+                }
+                if (!world.getBlockState(structure.getPistonPos()).isAir())
+                    world.setBlockState(structure.getPistonPos(), Blocks.AIR.getDefaultState());
+            } else if (blockBreakingDeltaNow < 1) {
+                // TODO: 已经不记得这里为什么要retry了 下次看看
                 retry();
                 return;
             }
-            interactionManager.attackBlock(structure.getPistonPos(), Direction.DOWN);
-            if (!world.getBlockState(structure.getPistonPos()).isAir())
-                world.setBlockState(structure.getPistonPos(), Blocks.AIR.getDefaultState());
         } else {
             if (BlockUtils.getHardness(world.getBlockState(structure.getPistonPos())) < 0) {
                 // 怎么回事？byd活塞变基岩了？
@@ -691,24 +758,64 @@ public class Task implements Comparable<Task> {
             }
         }
         // 重新凭空放置活塞
-        ActionResult result = InventoryUtils.moveToOffHandDuring(
-                player,
-                pistonIndex,
-                () -> rotationUtils.useServerSideRotationDuring(
-                        player,
-                        () -> BlockUtils.interactBlock(interactionManager,
-                                player,
-                                world,
-                                Hand.OFF_HAND,
-                                new BlockHitResult(
-                                        Vec3d.of(structure.getPistonPos()),
-                                        Direction.DOWN,
-                                        structure.getPistonPos(),
-                                        false
-                                )
-                        )
-                )
-        );
+        ActionResult result;
+        final EasyPlaceProtocol easyPlaceProtocol = BlockMinerMod.getInstance().getConfig().getEasyPlaceProtocol();
+        if (easyPlaceProtocol == EasyPlaceProtocol.V3) {
+            result = InventoryUtils.moveToOffHandDuring(
+                    player,
+                    pistonIndex,
+                    () -> EasyPlaceUtils.placePistonV3(
+                            interactionManager,
+                            player,
+                            world,
+                            Hand.OFF_HAND,
+                            new BlockHitResult(
+                                    Vec3d.of(structure.getPistonPos()),
+                                    Direction.DOWN,
+                                    structure.getPistonPos(),
+                                    false
+                            ),
+                            structure.getPistonOffset().getOpposite()
+                    )
+            );
+        } else if (easyPlaceProtocol == EasyPlaceProtocol.V2) {
+            result = InventoryUtils.moveToOffHandDuring(
+                    player,
+                    pistonIndex,
+                    () -> EasyPlaceUtils.placePistonCarpetExtra(
+                            interactionManager,
+                            player,
+                            world,
+                            Hand.OFF_HAND,
+                            new BlockHitResult(
+                                    Vec3d.of(structure.getPistonPos()),
+                                    Direction.DOWN,
+                                    structure.getPistonPos(),
+                                    false
+                            ),
+                            structure.getPistonOffset().getOpposite()
+                    )
+            );
+        } else {
+            result = InventoryUtils.moveToOffHandDuring(
+                    player,
+                    pistonIndex,
+                    () -> rotationUtils.useServerSideRotationDuring(
+                            player,
+                            () -> BlockUtils.interactBlock(interactionManager,
+                                    player,
+                                    world,
+                                    Hand.OFF_HAND,
+                                    new BlockHitResult(
+                                            Vec3d.of(structure.getPistonPos()),
+                                            Direction.DOWN,
+                                            structure.getPistonPos(),
+                                            false
+                                    )
+                            )
+                    )
+            );
+        }
         if (!result.isAccepted()) {
             // ?????
             retry();

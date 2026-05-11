@@ -7,6 +7,7 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import it.unimi.dsi.fastutil.booleans.BooleanConsumer;
 import me.z7087.blockminer.BlockMinerMod;
 import me.z7087.blockminer.api.base.BaseConfig;
+import me.z7087.blockminer.api.enums.EasyPlaceProtocol;
 import me.z7087.blockminer.command.argument.BlockPosArgumentType;
 import me.z7087.blockminer.config.Config;
 import me.z7087.blockminer.api.enums.DistanceCalculationMode;
@@ -219,6 +220,13 @@ public final class Command {
                                 SearchMode.values(),
                                 () -> BlockMinerMod.getInstance().getConfig().getSearchMode(),
                                 (value) -> BlockMinerMod.getInstance().getConfig().setSearchMode(value)
+                        )
+                ).then(
+                        enumConfigArgBuilder(
+                                "easyplace-protocol",
+                                EasyPlaceProtocol.values(),
+                                () -> BlockMinerMod.getInstance().getConfig().getEasyPlaceProtocol(),
+                                (value) -> BlockMinerMod.getInstance().getConfig().setEasyPlaceProtocol(value)
                         )
                 ).then(literal("target-block")
                         .then(literal("whitelist")

@@ -7,6 +7,7 @@ import com.google.gson.stream.MalformedJsonException;
 import me.z7087.blockminer.BlockMinerMod;
 import me.z7087.blockminer.api.base.BaseConfig;
 import me.z7087.blockminer.api.enums.DistanceCalculationMode;
+import me.z7087.blockminer.api.enums.EasyPlaceProtocol;
 import me.z7087.blockminer.api.enums.PowerBlockType;
 import me.z7087.blockminer.api.enums.SearchMode;
 import me.z7087.final2constant.Constant;
@@ -51,6 +52,7 @@ public abstract class Config extends BaseConfig {
                     (Function<Config, DynamicConstant<PowerBlockType>> & Serializable) Config::powerBlockUsage,
                     (Function<Config, DynamicConstant<DistanceCalculationMode>> & Serializable) Config::distanceCalculationMode,
                     (Function<Config, DynamicConstant<SearchMode>> & Serializable) Config::searchMode,
+                    (Function<Config, DynamicConstant<EasyPlaceProtocol>> & Serializable) Config::easyPlaceProtocol,
                     (Function<Config, Set<Block>> & Serializable) Config::blockWhitelist,
                     (Function<Config, Set<Block>> & Serializable) Config::dependBlockWhitelist,
                     (Function<Config, Set<Item>> & Serializable) Config::dependBlockItemWhitelist
@@ -82,6 +84,7 @@ public abstract class Config extends BaseConfig {
         final DynamicConstant<PowerBlockType> powerBlockUsage = Constant.factory.ofMutable(PowerBlockType.Both);
         final DynamicConstant<DistanceCalculationMode> distanceCalculationMode = Constant.factory.ofMutable(DistanceCalculationMode.currentClientVersion);
         final DynamicConstant<SearchMode> searchMode = Constant.factory.ofMutable(SearchMode.All);
+        final DynamicConstant<EasyPlaceProtocol> easyPlaceProtocol = Constant.factory.ofMutable(EasyPlaceProtocol.None);
         final Set<Block> blockWhitelist = new HashSet<>();
 
         final Set<Block> dependBlockWhitelist = new HashSet<>();
@@ -96,6 +99,7 @@ public abstract class Config extends BaseConfig {
                     powerBlockUsage,
                     distanceCalculationMode,
                     searchMode,
+                    easyPlaceProtocol,
                     blockWhitelist,
                     dependBlockWhitelist,
                     dependBlockItemWhitelist
@@ -113,6 +117,7 @@ public abstract class Config extends BaseConfig {
     protected abstract DynamicConstant<PowerBlockType> powerBlockUsage();
     protected abstract DynamicConstant<DistanceCalculationMode> distanceCalculationMode();
     protected abstract DynamicConstant<SearchMode> searchMode();
+    protected abstract DynamicConstant<EasyPlaceProtocol> easyPlaceProtocol();
 
     public static Config createDefaultConfig() {
         final Config config = Config.createInstance();
@@ -205,6 +210,7 @@ public abstract class Config extends BaseConfig {
             out.name("power-block-usage").value(config.getPowerBlockUsage().toString());
             out.name("distance-calculation-mode").value(config.getDistanceCalculationMode().toString());
             out.name("search-mode").value(config.getSearchMode().toString());
+            out.name("easyplace-protocol").value(config.getEasyPlaceProtocol().toString());
             final Identifier defaultId = Registries.BLOCK.getDefaultId();
             {
                 out.name("whitelist").beginArray();
@@ -267,6 +273,10 @@ public abstract class Config extends BaseConfig {
                         }
                         case "search-mode": {
                             config.setSearchMode(SearchMode.of(in.nextString()));
+                            break;
+                        }
+                        case "easyplace-protocol": {
+                            config.setEasyPlaceProtocol(EasyPlaceProtocol.of(in.nextString()));
                             break;
                         }
                         case "whitelist": {
