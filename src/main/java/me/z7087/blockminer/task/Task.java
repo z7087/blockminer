@@ -24,6 +24,7 @@ import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Vec3d;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 
@@ -206,57 +207,44 @@ public class Task implements Comparable<Task> {
                     state = TaskState.PlaceBlocksWithoutChecks;
                     return true;
                 } else {
-                    // 朝上下的活塞的朝向可以立即到位，其他方向的不行
-                    switch (structure.getPistonFace()) {
-                        case UP:
-                        case DOWN: {
-                            // 如果活塞朝上，面向下，否则面向上
-                            float pitch = structure.getPistonFace() == Direction.UP ? 90F : -90F;
-                            if (rotationUtils.canSetPitch(pitch)) {
-                                assertTrue(rotationUtils.trySetPitch(pitch));
-                                rotationUtils.updateLocation(player);
-                                state = TaskState.PlaceBlocksWithoutChecks;
-                                // 继续循环
-                                return true;
+                    if (structure.getPistonFace().getAxis() != Direction.Axis.Y) {
+                        float yaw;
+                        switch (structure.getPistonFace()) {
+                            case SOUTH: {
+                                // 朝北
+                                yaw = 180F;
+                                break;
                             }
-                            return false;
+                            case WEST: {
+                                // 朝东
+                                yaw = -90F;
+                                break;
+                            }
+                            case NORTH: {
+                                // 朝南
+                                yaw = 0F;
+                                break;
+                            }
+                            case EAST:
+                            default: {
+                                // 朝西
+                                yaw = 90F;
+                            }
                         }
-                        default: {
-                            float pitch = 0;
-                            float yaw;
-                            // 假定玩家面向正南时 yaw = 0
-                            switch (structure.getPistonFace()) {
-                                case SOUTH: {
-                                    // 朝北
-                                    yaw = 180F;
-                                    break;
-                                }
-                                case WEST: {
-                                    // 朝东
-                                    yaw = -90F;
-                                    break;
-                                }
-                                case NORTH: {
-                                    // 朝南
-                                    yaw = 0F;
-                                    break;
-                                }
-                                case EAST:
-                                default: {
-                                    // 朝西
-                                    yaw = 90F;
-                                }
-                            }
-                            if (rotationUtils.canSetRotation(yaw, pitch)) {
-                                assertTrue(rotationUtils.trySetRotation(yaw, pitch));
-                                rotationUtils.markKeepRotation();
-                                state = TaskState.WaitForPistonPlaceRotate;
-                                setUncertainManagerKeepTicks(1);
-                                ((ClientPlayerEntityAccessor) player).invokeSendMovementPackets();
-                                return true;
-                            }
-                            return false;
+                        if (rotationUtils.canPushYaw(yaw)) {
+                            assertTrue(rotationUtils.tryPushYaw(yaw, Lookup.of(this)));
+                            rotationUtils.markKeepYaw(Lookup.of(this));
+                            rotationUtils.updateLocation(player);
+                            state = TaskState.WaitForPistonPlaceRotate;
+                            setUncertainManagerKeepTicks(1);
+                            ((ClientPlayerEntityAccessor) player).invokeSendMovementPackets();
+                            return true;
                         }
+                        return false; // 此处可改为continue
+                    } else {
+                        state = TaskState.PlaceBlocksWithoutChecks;
+                        // 继续循环
+                        return true;
                     }
                 }
             }
@@ -266,7 +254,7 @@ public class Task implements Comparable<Task> {
 
     private boolean waitForPistonPlaceRotate() {
         if (!BlockMinerMod.getInstance().getUncertainManager().isYawDirectionKeeping(uncertainManagerKeepTicks)) {
-            BlockMinerMod.getInstance().getRotationUtils().markKeepRotation();
+            BlockMinerMod.getInstance().getRotationUtils().markKeepYaw(Lookup.of(this));
             return false;
         }
         state = TaskState.PlaceBlocksWithChecks;
@@ -383,19 +371,30 @@ public class Task implements Comparable<Task> {
                         )
                 );
             } else {
+                float pitch = 0F;
+                final Direction pistonFace = structure.getPistonFace();
+                if (pistonFace.getAxis() == Direction.Axis.Y) {
+                    pitch = pistonFace == Direction.UP ? 90F : -90F;
+                }
+                final float finalPitch = pitch;
                 result = InventoryUtils.moveToOffHandDuring(player,
                         pistonIndex,
-                        () -> rotationUtils.useServerSideRotationDuring(
+                        () -> rotationUtils.pushPitchAndUpdateLocationDuring(
                                 player,
-                                () -> BlockUtils.interactBlock(interactionManager,
+                                finalPitch,
+                                Lookup.of(this),
+                                () -> rotationUtils.useServerSideRotationDuring(
                                         player,
-                                        world,
-                                        Hand.OFF_HAND,
-                                        new BlockHitResult(
-                                                Vec3d.of(structure.getPistonPos()),
-                                                Direction.DOWN,
-                                                structure.getPistonPos(),
-                                                false
+                                        () -> BlockUtils.interactBlock(interactionManager,
+                                                player,
+                                                world,
+                                                Hand.OFF_HAND,
+                                                new BlockHitResult(
+                                                        Vec3d.of(structure.getPistonPos()),
+                                                        Direction.DOWN,
+                                                        structure.getPistonPos(),
+                                                        false
+                                                )
                                         )
                                 )
                         )
@@ -536,46 +535,35 @@ public class Task implements Comparable<Task> {
                 return;
             }
         }
-        if (BlockMinerMod.getInstance().getConfig().getEasyPlaceProtocol() == EasyPlaceProtocol.None) {
+        if (BlockMinerMod.getInstance().getConfig().getEasyPlaceProtocol() == EasyPlaceProtocol.None && pistonToTargetBlockFace.getAxis() != Direction.Axis.Y) {
+            float yaw;
             switch (pistonToTargetBlockFace) {
-                case UP:
-                case DOWN: {
-                    if (rotationUtils.trySetPitch(pistonToTargetBlockFace == Direction.UP ? 90F : -90F)) {
-                        break;
-                    }
-                    return;
+                case SOUTH: {
+                    // 朝北
+                    yaw = 180F;
+                    break;
                 }
+                case WEST: {
+                    // 朝东
+                    yaw = -90F;
+                    break;
+                }
+                case NORTH: {
+                    // 朝南
+                    yaw = 0F;
+                    break;
+                }
+                case EAST:
                 default: {
-                    float pitch = 0;
-                    float yaw;
-                    // 假定玩家面向正南时 yaw = 0
-                    switch (pistonToTargetBlockFace) {
-                        case SOUTH: {
-                            // 朝北
-                            yaw = 180F;
-                            break;
-                        }
-                        case WEST: {
-                            // 朝东
-                            yaw = -90F;
-                            break;
-                        }
-                        case NORTH: {
-                            // 朝南
-                            yaw = 0F;
-                            break;
-                        }
-                        case EAST:
-                        default: {
-                            // 朝西
-                            yaw = 90F;
-                        }
-                    }
-                    if (rotationUtils.trySetRotation(yaw, pitch)) {
-                        break;
-                    }
-                    return;
+                    // 朝西
+                    yaw = 90F;
                 }
+            }
+            if (rotationUtils.tryPushYaw(yaw, Lookup.of(this))) {
+                rotationUtils.markKeepYaw(Lookup.of(this));
+                rotationUtils.updateLocation(player);
+            } else {
+                return;
             }
         }
         if (startBreakPistonLater) {
@@ -584,8 +572,6 @@ public class Task implements Comparable<Task> {
             interactionManager.cancelBlockBreaking();
             interactionManager.attackBlock(structure.getPistonPos(), Direction.DOWN);
         }
-        rotationUtils.markKeepRotation();
-        rotationUtils.updateLocation(player);
         // 等待活塞进入正在展开状态，不需要完全展开
         state = TaskState.WaitForPistonExtend;
         setWaitTicks(blockBreakingDelta >= 0.7 ? 1 : (int) Math.ceil(0.7 / blockBreakingDelta) + 1);
@@ -602,8 +588,8 @@ public class Task implements Comparable<Task> {
             rotationUtils = BlockMinerMod.getInstance().getRotationUtils();
         }
         if (getWaitTicksAfterDecrement() > 0) {
-            if (BlockMinerMod.getInstance().getConfig().getEasyPlaceProtocol() == EasyPlaceProtocol.None) {
-                rotationUtils.markKeepRotation();
+            if (BlockMinerMod.getInstance().getConfig().getEasyPlaceProtocol() == EasyPlaceProtocol.None && structure.getPistonOffset().getAxis() != Direction.Axis.Y) {
+                rotationUtils.markKeepYaw(Lookup.of(this));
             }
             if (pickaxeIndex != -1) {
                 InventoryUtils.setSelectedSlot(inventory, pickaxeIndex);
@@ -647,8 +633,8 @@ public class Task implements Comparable<Task> {
                         || (blockBreakingDelta >= 0.7 && (InventoryUtils.calcBlockBreakingDelta(player, Blocks.PISTON.getDefaultState(), player.getMainHandStack()) < 0.7 || BlockMinerMod.getInstance().getBlockBreakUtils().isModBreakingBlock()))
         ) {
             // 延后。
-            if (BlockMinerMod.getInstance().getConfig().getEasyPlaceProtocol() == EasyPlaceProtocol.None) {
-                rotationUtils.markKeepRotation();
+            if (BlockMinerMod.getInstance().getConfig().getEasyPlaceProtocol() == EasyPlaceProtocol.None && structure.getPistonOffset().getAxis() != Direction.Axis.Y) {
+                rotationUtils.markKeepYaw(Lookup.of(this));
             }
             return;
         }
@@ -692,6 +678,9 @@ public class Task implements Comparable<Task> {
                     ClientPlayerInteractionManagerAccessor interactionManagerAccessor = (ClientPlayerInteractionManagerAccessor) interactionManager;
                     while (interactionManager.isBreakingBlock() && interactionManagerAccessor.invokeIsCurrentlyBreaking(structure.getPistonPos()))
                         interactionManager.updateBlockBreakingProgress(structure.getPistonPos(), Direction.DOWN);
+                } else {
+                    retry();
+                    return;
                 }
                 if (!world.getBlockState(structure.getPistonPos()).isAir())
                     world.setBlockState(structure.getPistonPos(), Blocks.AIR.getDefaultState());
@@ -797,20 +786,31 @@ public class Task implements Comparable<Task> {
                     )
             );
         } else {
+            float pitch = 0F;
+            final Direction pistonToTargetBlockFace = structure.getPistonOffset().getOpposite();
+            if (pistonToTargetBlockFace.getAxis() == Direction.Axis.Y) {
+                pitch = pistonToTargetBlockFace == Direction.UP ? 90F : -90F;
+            }
+            final float finalPitch = pitch;
             result = InventoryUtils.moveToOffHandDuring(
                     player,
                     pistonIndex,
-                    () -> rotationUtils.useServerSideRotationDuring(
+                    () -> rotationUtils.pushPitchAndUpdateLocationDuring(
                             player,
-                            () -> BlockUtils.interactBlock(interactionManager,
+                            finalPitch,
+                            Lookup.of(this),
+                            () -> rotationUtils.useServerSideRotationDuring(
                                     player,
-                                    world,
-                                    Hand.OFF_HAND,
-                                    new BlockHitResult(
-                                            Vec3d.of(structure.getPistonPos()),
-                                            Direction.DOWN,
-                                            structure.getPistonPos(),
-                                            false
+                                    () -> BlockUtils.interactBlock(interactionManager,
+                                            player,
+                                            world,
+                                            Hand.OFF_HAND,
+                                            new BlockHitResult(
+                                                    Vec3d.of(structure.getPistonPos()),
+                                                    Direction.DOWN,
+                                                    structure.getPistonPos(),
+                                                    false
+                                            )
                                     )
                             )
                     )
@@ -989,5 +989,18 @@ public class Task implements Comparable<Task> {
     @Override
     public int compareTo(Task o) {
         return targetPos.compareTo(o.targetPos);
+    }
+    
+    public static class Lookup {
+        @NotNull
+        public final Task instance;
+
+        private Lookup(Task instance) {
+            this.instance = Objects.requireNonNull(instance);
+        }
+
+        static Lookup of(Task instance) {
+            return new Lookup(instance);
+        }
     }
 }

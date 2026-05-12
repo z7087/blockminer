@@ -35,8 +35,10 @@ public final class EasyPlaceUtils {
                     ),
                     hitResult.getSide(),
                     hitResult.getBlockPos(),
-                    hitResult.isInsideBlock(),
-                    hitResult.isAgainstWorldBorder()
+                    hitResult.isInsideBlock()
+                    //#if MC >= 12102
+                    , hitResult.isAgainstWorldBorder()
+                    //#endif
             );
         }
         final BlockHitResult finalHitResult = hitResult;
@@ -66,8 +68,10 @@ public final class EasyPlaceUtils {
                     ),
                     hitResult.getSide(),
                     hitResult.getBlockPos(),
-                    hitResult.isInsideBlock(),
-                    hitResult.isAgainstWorldBorder()
+                    hitResult.isInsideBlock()
+                    //#if MC >= 12102
+                    , hitResult.isAgainstWorldBorder()
+                    //#endif
             );
         }
         final BlockHitResult finalHitResult = hitResult;

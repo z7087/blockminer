@@ -1,7 +1,6 @@
 package me.z7087.blockminer.mixin.minecraft.client.network;
 
 import me.z7087.blockminer.BlockMinerMod;
-import me.z7087.blockminer.util.data.Rotation;
 import net.minecraft.client.network.ClientPlayerEntity;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -26,24 +25,17 @@ public abstract class MixinClientPlayerEntity {
     //$$ )
     //#endif
     private float onGetYaw(ClientPlayerEntity player) {
+        float yaw =
+                //#if MC >= 11700
+                player.getYaw()
+                //#else
+                //$$ player.yaw
+                //#endif
+                ;
         if (!BlockMinerMod.getInstance().getTaskManager().isEnabled()) {
-            //#if MC >= 11700
-            return player.getYaw();
-            //#else
-            //$$ return player.yaw;
-            //#endif
+            return yaw;
         }
-        final Rotation rotation = BlockMinerMod.getInstance().getRotationUtils().getRotation();
-        final float yaw;
-        if (rotation.hasYaw()) {
-            yaw = rotation.getYaw();
-        } else {
-            //#if MC >= 11700
-            yaw = player.getYaw();
-            //#else
-            //$$ yaw = player.yaw;
-            //#endif
-        }
+        yaw = BlockMinerMod.getInstance().getRotationUtils().getYaw(yaw);
         BlockMinerMod.getInstance().getUncertainManager().onYawDirectionUpdate(yaw);
         return yaw;
     }
@@ -65,15 +57,16 @@ public abstract class MixinClientPlayerEntity {
     //$$ )
     //#endif
     private float onGetPitch(ClientPlayerEntity player) {
-        final Rotation rotation;
-        if (BlockMinerMod.getInstance().getTaskManager().isEnabled()
-                && (rotation = BlockMinerMod.getInstance().getRotationUtils().getRotation()).hasPitch()
-        )
-            return rotation.getPitch();
-        //#if MC >= 11700
-        return player.getPitch();
-        //#else
-        //$$ return player.pitch;
-        //#endif
+        final float pitch =
+                //#if MC >= 11700
+                player.getPitch()
+                //#else
+                //$$ player.pitch
+                //#endif
+                ;
+        if (!BlockMinerMod.getInstance().getTaskManager().isEnabled()) {
+            return pitch;
+        }
+        return BlockMinerMod.getInstance().getRotationUtils().getPitch(pitch);
     }
 }

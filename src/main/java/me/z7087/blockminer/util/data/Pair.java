@@ -15,6 +15,14 @@ public final class Pair<F, S> {
         return new Pair<>(first, second);
     }
 
+    public F first() {
+        return first;
+    }
+
+    public S second() {
+        return second;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (o instanceof Pair) {

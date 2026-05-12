@@ -1,7 +1,9 @@
 package me.z7087.blockminer.util;
 
 import me.z7087.blockminer.mixin.minecraft.client.network.ClientPlayerEntityAccessor;
-import me.z7087.blockminer.util.data.Rotation;
+import me.z7087.blockminer.task.Task;
+import me.z7087.blockminer.util.data.Pair;
+import me.z7087.blockminer.util.data.SingleAxisRotation;
 import me.z7087.final2constant.Constant;
 import me.z7087.final2constant.util.JavaHelper;
 import net.minecraft.client.MinecraftClient;
@@ -25,11 +27,12 @@ public abstract class RotationUtils {
         try {
             final String[][] immutableNamesAndDescriptors = JavaHelper.getNamesAndDescriptors(
                     MethodHandles.lookup(),
-                    (Function<RotationUtils, Deque<Rotation>> & Serializable) RotationUtils::rotations
+                    (Function<RotationUtils, Deque<SingleAxisRotation>> & Serializable) RotationUtils::yawRotations,
+                    (Function<RotationUtils, Deque<SingleAxisRotation>> & Serializable) RotationUtils::pitchRotations
             );
             final String[][] mutableNamesAndDescriptors = JavaHelper.getNamesAndDescriptors(
                     MethodHandles.lookup(),
-                    (Function<RotationUtils, Boolean> & Serializable) RotationUtils::keepRotationToNextTick
+                    (Function<RotationUtils, Boolean> & Serializable) RotationUtils::keepYawToNextTick
             );
             immutableNames = immutableNamesAndDescriptors[0];
             immutableDescriptors = immutableNamesAndDescriptors[1];
@@ -52,102 +55,142 @@ public abstract class RotationUtils {
     }
 
     public static RotationUtils createInstance() {
-        final Deque<Rotation> rotations = new ArrayDeque<>();
-        rotations.add(Rotation.NONE);
+        final Deque<SingleAxisRotation> yawRotations = new ArrayDeque<>();
+        final Deque<SingleAxisRotation> pitchRotations = new ArrayDeque<>();
         try {
             return (RotationUtils) CONSTRUCTOR.invokeExact(
-                    rotations
+                    yawRotations,
+                    pitchRotations
             );
         } catch (Throwable e) {
             throw new RuntimeException(e);
         }
     }
 
-    abstract Deque<Rotation> rotations();
+    abstract Deque<SingleAxisRotation> yawRotations();
+    abstract Deque<SingleAxisRotation> pitchRotations();
 
-    abstract boolean keepRotationToNextTick();
-    abstract void keepRotationToNextTick(boolean value);
+    abstract boolean keepYawToNextTick();
+    abstract void keepYawToNextTick(boolean value);
 
-    public Rotation getRotation() {
-        return rotations().getFirst();
+    private Pair<SingleAxisRotation, SingleAxisRotation> pushRotation(float yaw, float pitch) {
+        final Pair<SingleAxisRotation, SingleAxisRotation> rotations =
+                SingleAxisRotation.ofLinked(yaw, pitch);
+        yawRotations().addFirst(rotations.first());
+        pitchRotations().addFirst(rotations.second());
+        return rotations;
     }
 
-    private void setRotation(Rotation rotation) {
-        rotations().removeFirst();
-        rotations().addFirst(rotation);
-    }
-
-    private void pushRotation(Rotation rotation) {
-        rotations().addFirst(rotation);
-    }
-
-    private void popRotation() {
-        if (rotations().size() <= 1)
-            throw new IllegalStateException("cannot pop rotation for size <=1 stack");
-        rotations().removeFirst();
+    private void testAndPopRotation(SingleAxisRotation yawRotation, SingleAxisRotation pitchRotation) {
+        if (yawRotations().isEmpty() || pitchRotations().isEmpty())
+            throw new IllegalStateException("cannot pop rotation for empty stacks");
+        if (yawRotations().getFirst() == yawRotation && pitchRotations().getFirst() == pitchRotation) {
+            yawRotations().removeFirst();
+            pitchRotations().removeFirst();
+        }
+        throw new IllegalStateException("the rotation to pop is not on top of the stack");
     }
 
     public boolean hasYaw() {
-        return getRotation().hasYaw();
+        return !yawRotations().isEmpty();
     }
 
     public float getYaw(float defaultYaw) {
-        return getRotation().getYaw(defaultYaw);
+        if (!hasYaw()) {
+            return defaultYaw;
+        }
+        return yawRotations().getFirst().angle;
     }
 
     public boolean hasPitch() {
-        return getRotation().hasPitch();
+        return !pitchRotations().isEmpty();
     }
 
     public float getPitch(float defaultPitch) {
-        return getRotation().getPitch(defaultPitch);
+        if (!hasPitch()) {
+            return defaultPitch;
+        }
+        return pitchRotations().getFirst().angle;
     }
 
-    public boolean canSetRotation(float yaw, float pitch) {
-        final Rotation oldRotation = getRotation();
-        return (!oldRotation.hasYaw() || oldRotation.getYaw() == yaw)
-                && (!oldRotation.hasPitch() || oldRotation.getPitch() == pitch);
+    // 需要假设没有为none的Rotation在stack里
+    // 重构前可能出现 之后就不允许了
+    public boolean canPushRotation(float yaw, float pitch) {
+        return canPushYaw(yaw);
     }
 
-    public boolean trySetRotation(float yaw, float pitch) {
-        final Rotation oldRotation = getRotation();
-        if ((oldRotation.hasYaw() && oldRotation.getYaw() != yaw)
-                || (oldRotation.hasPitch() && oldRotation.getPitch() != pitch))
-            return false;
-        setRotation(Rotation.ofFull(yaw, pitch));
+    public boolean tryPushRotation(float yaw, float pitch, Task.Lookup ownerTask) {
+        if (!hasYaw()) {
+            final Pair<SingleAxisRotation, SingleAxisRotation> rotations = SingleAxisRotation.ofLinked(yaw, pitch, ownerTask);
+            yawRotations().addFirst(rotations.first());
+            pitchRotations().addFirst(rotations.second());
+        } else {
+            SingleAxisRotation firstYaw = yawRotations().getFirst();
+            if (firstYaw.angle != yaw) {
+                return false;
+            }
+            firstYaw.addDependTask(ownerTask);
+            pitchRotations().addFirst(SingleAxisRotation.of(pitch, ownerTask));
+        }
         return true;
     }
 
-    public boolean canSetYaw(float yaw) {
-        final Rotation oldRotation = getRotation();
-        return !oldRotation.hasYaw() || oldRotation.getYaw() == yaw;
+    public boolean canPushYaw(float yaw) {
+        return !hasYaw() || yawRotations().getFirst().angle == yaw;
     }
 
-    public boolean trySetYaw(float yaw) {
-        final Rotation oldRotation = getRotation();
-        if (oldRotation.hasYaw() && oldRotation.getYaw() != yaw)
+    public boolean tryPushYaw(float yaw, Task.Lookup ownerTask) {
+        final SingleAxisRotation firstYaw;
+        if (!hasYaw()) {
+            yawRotations().addFirst(SingleAxisRotation.of(yaw, ownerTask));
+            return true;
+        } else if ((firstYaw = yawRotations().getFirst()).angle == yaw) {
+            firstYaw.addDependTask(ownerTask);
+            return true;
+        } else {
             return false;
-        else if (oldRotation.hasPitch())
-            setRotation(Rotation.ofFull(yaw, oldRotation.getPitch()));
-        else
-            setRotation(Rotation.ofYawOnly(yaw));
-        return true;
+        }
     }
 
-    public boolean canSetPitch(float pitch) {
-        final Rotation oldRotation = getRotation();
-        return !oldRotation.hasPitch() || oldRotation.getPitch() == pitch;
+    public void popYaw(Task.Lookup ownerTask) {
+        final SingleAxisRotation firstYaw;
+        if (!hasYaw()) {
+            throw new IllegalStateException("popping yaw while no yaw pushed");
+        } else if ((firstYaw = yawRotations().getFirst()).isOwner(ownerTask.instance) || firstYaw.inDependTasks(ownerTask.instance)) {
+            if (!firstYaw.popOwnerOrDependTask(ownerTask)) {
+                yawRotations().removeFirst();
+            }
+        }
+        throw new IllegalStateException("not the owner");
     }
 
-    public boolean trySetPitch(float pitch) {
-        Rotation oldRotation = getRotation();
-        if (oldRotation.hasPitch() && oldRotation.getPitch() != pitch)
-            return false;
-        if (oldRotation.hasYaw())
-            setRotation(Rotation.ofFull(oldRotation.getYaw(), pitch));
-        else
-            setRotation(Rotation.ofPitchOnly(pitch));
-        return true;
+    // 现在没有canPushPitch 因为注意到pitch是瞬时到位 用时可以立即设置并使用
+
+    @Deprecated
+    public void pushPitch(float pitch, Task.Lookup ownerTask) {
+        pitchRotations().addFirst(SingleAxisRotation.of(pitch, ownerTask));
+    }
+
+    // 记得updateLocation。
+    public <T> T pushPitchDuring(float pitch, Task.Lookup ownerTask, Supplier<T> supplier) {
+        final SingleAxisRotation pitchRotation = SingleAxisRotation.of(pitch, ownerTask);
+        pitchRotations().addFirst(pitchRotation);
+        T result = supplier.get();
+        if (pitchRotation != pitchRotations().removeFirst()) {
+            throw new IllegalStateException("concurrent modification");
+        }
+        return result;
+    }
+
+    public <T> T pushPitchAndUpdateLocationDuring(ClientPlayerEntity player, float pitch, Task.Lookup ownerTask, Supplier<T> supplier) {
+        final SingleAxisRotation pitchRotation = SingleAxisRotation.of(pitch, ownerTask);
+        pitchRotations().addFirst(pitchRotation);
+        updateLocation(player);
+        T result = supplier.get();
+        if (pitchRotation != pitchRotations().removeFirst()) {
+            throw new IllegalStateException("concurrent modification");
+        }
+        return result;
     }
 
     public void updateLocation(ClientPlayerEntity player) {
@@ -170,7 +213,7 @@ public abstract class RotationUtils {
                 originBoundingBox = player.getBoundingBox();
                 player.setPosition(x, y, z);
             }
-            pushRotation(Rotation.ofFull(yaw, pitch));
+            final Pair<SingleAxisRotation, SingleAxisRotation> rotations = pushRotation(yaw, pitch);
             if (onGroundStateChanged)
                 player.setOnGround(onGround);
             playerAccessor.invokeSendMovementPackets();
@@ -179,7 +222,7 @@ public abstract class RotationUtils {
                 player.setPosition(originX, originY, originZ);
                 player.setBoundingBox(originBoundingBox);
             }
-            popRotation();
+            testAndPopRotation(rotations.first(), rotations.second());
             if (onGroundStateChanged)
                 player.setOnGround(originOnGround);
             playerAccessor.invokeSendMovementPackets();
@@ -225,10 +268,10 @@ public abstract class RotationUtils {
                 && MinecraftClient.getInstance().getCameraEntity() == player
         ) {
             final ClientPlayerEntityAccessor playerAccessor = (ClientPlayerEntityAccessor) player;
-            pushRotation(Rotation.ofFull(yaw, pitch));
+            final Pair<SingleAxisRotation, SingleAxisRotation> rotations = pushRotation(yaw, pitch);
             playerAccessor.invokeSendMovementPackets();
             runnable.run();
-            popRotation();
+            testAndPopRotation(rotations.first(), rotations.second());
             playerAccessor.invokeSendMovementPackets();
             return;
         }
@@ -263,23 +306,36 @@ public abstract class RotationUtils {
         return result;
     }
 
-    public void markKeepRotation() {
-        keepRotationToNextTick(true);
+    public void markKeepYaw(Task.Lookup ownerTask) {
+        if (yawRotations().isEmpty()) {
+            throw new IllegalStateException("Cannot mark keep yaw when no rotations have been set!");
+        }
+        final SingleAxisRotation firstYaw = yawRotations().getFirst();
+        if (firstYaw.isOwner(ownerTask.instance) || firstYaw.inDependTasks(ownerTask.instance)) {
+            keepYawToNextTick(true);
+            return;
+        }
+        throw new IllegalStateException("Only the owner task or its depend tasks can mark keep yaw!");
     }
 
     public void forceClearRotations() {
-        rotations().clear();
-        rotations().add(Rotation.NONE);
-        keepRotationToNextTick(false);
+        yawRotations().clear();
+        pitchRotations().clear();
+        keepYawToNextTick(false);
     }
 
-    public void resetRotationIfNoKeepRotation() {
-        if (rotations().size() > 1) {
+    // 实际上stack上最多只有一个任务使用的yaw... 所有权机制似乎没什么用了 每个需要yaw的任务必定需求-
+    // 下一tick相同yaw 能想到的好处只有依赖此yaw的任务全部完成后在同tick立即清除yaw并进入另一个yaw的使用流程
+    public void resetYawRotationIfNoKeepYaw() {
+        if (yawRotations().size() > 1) {
             throw new IllegalStateException("called resetRotation() during calling useRotationDuring()");
         }
-        if (keepRotationToNextTick())
-            keepRotationToNextTick(false);
+        if (!pitchRotations().isEmpty()) {
+            throw new IllegalStateException("pitch rotation stack should be empty when resetting yaw rotation");
+        }
+        if (keepYawToNextTick())
+            keepYawToNextTick(false);
         else
-            setRotation(Rotation.NONE);
+            yawRotations().clear();
     }
 }

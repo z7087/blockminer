@@ -98,7 +98,7 @@ public abstract class TaskManager {
     public void tick() {
         if (!isEnabled())
             return;
-        BlockMinerMod.getInstance().getRotationUtils().resetRotationIfNoKeepRotation();
+        BlockMinerMod.getInstance().getRotationUtils().resetYawRotationIfNoKeepYaw();
         final ClientPlayerEntity player = BlockMinerMod.getInstance().ticklyUpdateConstants().player();
         if (player == null) {
             return;
