@@ -16,10 +16,7 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
 
     steps:
       - uses: actions/checkout@v4
@@ -45,6 +42,20 @@ jobs:
         with:
           name: BlockMiner-all
           path: build/libs/*.jar
+
+  prerelease:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/crossversion-preprocessor-fallen'
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: BlockMiner-all
+          path: build/libs/
 
       - name: Create prerelease
         uses: marvinpinto/action-automatic-releases@latest
