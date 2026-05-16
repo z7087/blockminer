@@ -47,6 +47,7 @@ public abstract class TaskManager {
             final String[][] immutableNamesAndDescriptors = JavaHelper.getNamesAndDescriptors(
                     MethodHandles.lookup(),
                     (Function<TaskManager, DynamicConstant<Boolean>> & Serializable) TaskManager::enabled,
+                    (Function<TaskManager, DynamicConstant<Boolean>> & Serializable) TaskManager::paused,
                     (Function<TaskManager, DynamicConstant<WeakReference<ClientWorld>>> & Serializable) TaskManager::prevWorldRef,
                     (Function<TaskManager, Set<BlockPos>> & Serializable) TaskManager::posSet,
                     (Function<TaskManager, LinkedList<Task>> & Serializable) TaskManager::taskQueue,
@@ -72,6 +73,7 @@ public abstract class TaskManager {
 
     public static TaskManager createInstance() {
         final DynamicConstant<Boolean> enabled = Constant.factory.ofVolatile(Boolean.FALSE);
+        final DynamicConstant<Boolean> paused = Constant.factory.ofMutable(Boolean.FALSE);
         final DynamicConstant<WeakReference<ClientWorld>> prevWorldRef = Constant.factory.ofMutable(null);
         final Set<BlockPos> posSet = new HashSet<>();
         final LinkedList<Task> taskQueue = new LinkedList<>();
@@ -79,6 +81,7 @@ public abstract class TaskManager {
         try {
             return (TaskManager) CONSTRUCTOR.invokeExact(
                     enabled,
+                    paused,
                     prevWorldRef,
                     posSet,
                     taskQueue,
@@ -90,13 +93,14 @@ public abstract class TaskManager {
     }
 
     abstract DynamicConstant<Boolean> enabled();
+    abstract DynamicConstant<Boolean> paused();
     abstract DynamicConstant<WeakReference<ClientWorld>> prevWorldRef();
     abstract Set<BlockPos> posSet();
     abstract LinkedList<Task> taskQueue();
     abstract PositionStorage positionsToClear();
 
     public void tick() {
-        if (!isEnabled())
+        if (!isEnabled() || isPaused())
             return;
         BlockMinerMod.getInstance().getRotationUtils().resetYawRotationIfNoKeepYaw();
         final ClientPlayerEntity player = BlockMinerMod.getInstance().ticklyUpdateConstants().player();
@@ -253,7 +257,7 @@ public abstract class TaskManager {
     }
 
     private void onEnable() {
-        this.setEnabled(true);
+        this.setEnabled0(true);
         ClientWorld world = MinecraftClient.getInstance().world;
         if (world == null) {
             this.setPrevWorldRef(null);
@@ -267,7 +271,7 @@ public abstract class TaskManager {
     }
 
     private void onDisable() {
-        this.setEnabled(false);
+        this.setEnabled0(false);
         //this.prevWorldRef = null;
         clearTasks();
         positionsToClear().clear();
@@ -280,8 +284,16 @@ public abstract class TaskManager {
         return enabled().orElseThrow();
     }
 
-    private void setEnabled(boolean value) {
+    private void setEnabled0(boolean value) {
         enabled().set(value);
+    }
+
+    public boolean isPaused() {
+        return paused().orElseThrow();
+    }
+
+    public void setPaused(boolean value) {
+        paused().set(value);
     }
 
     public boolean isTaskExists(BlockPos pos) {

@@ -13,6 +13,7 @@ import me.z7087.blockminer.config.Config;
 import me.z7087.blockminer.api.enums.DistanceCalculationMode;
 import me.z7087.blockminer.api.enums.PowerBlockType;
 import me.z7087.blockminer.api.enums.SearchMode;
+import me.z7087.blockminer.task.TaskManager;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.block.Block;
 import net.minecraft.command.argument.BlockStateArgument;
@@ -142,6 +143,28 @@ public final class Command {
                         .executes((context) -> {
                             BlockMinerMod.getInstance().getTaskManager().toggle();
                             return 1;
+                        })
+                ).then(literal("pause")
+                        .executes((context) -> {
+                            final TaskManager taskManager = BlockMinerMod.getInstance().getTaskManager();
+                            if (!taskManager.isPaused()) {
+                                taskManager.setPaused(true);
+                                return 1;
+                            } else {
+                                context.getSource().sendFeedback(Text.of("already paused"));
+                                return 0;
+                            }
+                        })
+                ).then(literal("resume")
+                        .executes((context) -> {
+                            final TaskManager taskManager = BlockMinerMod.getInstance().getTaskManager();
+                            if (taskManager.isPaused()) {
+                                taskManager.setPaused(false);
+                                return 1;
+                            } else {
+                                context.getSource().sendFeedback(Text.of("not paused"));
+                                return 0;
+                            }
                         })
                 ).then(literal("config")
                         .then(literal("reload")
