@@ -7,6 +7,10 @@ public final class MessageUtils {
     private MessageUtils() {}
 
     public static void printMessage(Text message) {
+        //#if MC >= 260200
+        //$$ MinecraftClient.getInstance().guiManager.inGameHud.getChatHud().addClientSystemMessage(message);
+        //#else
         MinecraftClient.getInstance().inGameHud.getChatHud().addMessage(message);
+        //#endif
     }
 }

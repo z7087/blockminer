@@ -1,6 +1,6 @@
 plugins {
     id 'maven-publish'
-    id 'net.fabricmc.fabric-loom-remap' version '1.16.1' apply false
+    id 'net.fabricmc.fabric-loom-remap' version '1.17.9' apply false
 
     // https://github.com/ReplayMod/preprocessor
     // https://github.com/Fallen-Breath/preprocessor
@@ -34,6 +34,7 @@ preprocess {
     def mc_1_21_10 = createNode('1.21.10', 1_21_10, '')
     def mc_1_21_11 = createNode('1.21.11', 1_21_11, '')
     def mc_26_1_2 = createNode('26.1.2', 260102, '')
+    def mc_26_2 = createNode('26.2', 260200, '')
 
     // back
     mc_1_21_5.link(mc_1_21_4, null)
@@ -51,7 +52,7 @@ preprocess {
     mc_1_18_2.link(mc_1_18_1, null)
     mc_1_18_1.link(mc_1_17_1 , null)
     mc_1_17_1.link(mc_1_17 , null)
-    mc_1_17_1.link(mc_1_16_5 , null)
+    mc_1_17.link(mc_1_16_5 , null)
 //    mc_1_16_5.link(mc_1_15_2 , null)
 //    mc_1_15_2.link(mc_1_14_4 , null)
 
@@ -62,6 +63,7 @@ preprocess {
     mc_1_21_8.link(mc_1_21_10, null)
     mc_1_21_10.link(mc_1_21_11, null)
     mc_1_21_11.link(mc_26_1_2, file("versions/mapping-1.21.11-26.1.2.txt"))
+    mc_26_1_2.link(mc_26_2, null)
 }
 
 tasks.register('buildAndGather') {
