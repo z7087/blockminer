@@ -35,6 +35,7 @@ preprocess {
     def mc_1_21_11 = createNode('1.21.11', 1_21_11, '')
     def mc_26_1_2 = createNode('26.1.2', 260102, '')
     def mc_26_2 = createNode('26.2', 260200, '')
+    def mc_26_3 = createNode('26.3', 260300, '')
 
     // back
     mc_1_21_5.link(mc_1_21_4, null)
@@ -64,6 +65,7 @@ preprocess {
     mc_1_21_10.link(mc_1_21_11, null)
     mc_1_21_11.link(mc_26_1_2, file("versions/mapping-1.21.11-26.1.2.txt"))
     mc_26_1_2.link(mc_26_2, null)
+    mc_26_2.link(mc_26_3, null)
 }
 
 tasks.register('buildAndGather') {
