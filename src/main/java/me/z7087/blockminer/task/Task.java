@@ -949,7 +949,9 @@ public class Task implements Comparable<Task> {
         state = TaskState.Start;
         if (isMining) {
             BlockMinerMod.getInstance().getBlockBreakUtils().setBreaking(false);
-            Objects.requireNonNull(MinecraftClient.getInstance().interactionManager).cancelBlockBreaking();
+            final ClientPlayerInteractionManager interactionManager = BlockMinerMod.getInstance().ticklyUpdateConstants().interactionManager();
+            if (interactionManager != null)
+                interactionManager.cancelBlockBreaking();
             isMining = false;
         }
     }
