@@ -1,0 +1,24 @@
+// AI 生成的补丁自动应用：编译前把 patches/ 下的 .patch 依次 git apply。
+// 用法：把 .patch 放进 patches/，正常 ./gradlew build 即可。
+tasks.register('applyPatches') {
+    group = 'build'
+    description = 'Apply AI-generated .patch files from patches/ before compile'
+    doLast {
+        def patchDir = rootProject.file('patches')
+        if (!patchDir.exists()) { logger.lifecycle('[applyPatches] patches/ not found, skip'); return }
+        def patches = patchDir.listFiles({ d, n -> n.endsWith('.patch') } as FilenameFilter)?.sort()
+        if (!patches || patches.isEmpty()) { logger.lifecycle('[applyPatches] no patches, skip'); return }
+        logger.lifecycle("[applyPatches] ${patches.size()} patch(es) found")
+        patches.each { patch ->
+            logger.lifecycle("[applyPatches] applying ${patch.name}")
+            def r = exec { commandLine 'git', 'apply', '--3way', '--whitespace=fix', patch.absolutePath; ignoreExitValue = true }
+            if (r.exitValue != 0) {
+                def c = exec { commandLine 'git', 'apply', '--check', patch.absolutePath; ignoreExitValue = true }
+                if (c.exitValue != 0) throw new GradleException("[applyPatches] FAILED ${patch.name}")
+                logger.lifecycle("[applyPatches] ${patch.name} already applied, skip")
+            }
+        }
+        logger.lifecycle('[applyPatches] done')
+    }
+}
+tasks.named('compileJava').configure { dependsOn 'applyPatches' }
