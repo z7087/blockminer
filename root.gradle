@@ -7,6 +7,9 @@ plugins {
     id 'com.replaymod.preprocess' version 'c5abb4fb12'
 }
 
+// AI 生成的补丁：编译前自动应用（见 applyPatches.gradle 和 patches/README.md）
+apply from: 'applyPatches.gradle'
+
 preprocess {
     strictExtraMappings = false
 

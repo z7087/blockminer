@@ -21,4 +21,10 @@ tasks.register('applyPatches') {
         logger.lifecycle('[applyPatches] done')
     }
 }
-tasks.named('compileJava').configure { dependsOn 'applyPatches' }
+
+// 挂到所有版本子项目的 compileJava 之前（每个版本的源码是共享的 src/，所以补丁必须先应用）
+subprojects {
+    tasks.matching { it.name == 'compileJava' }.configureEach {
+        dependsOn rootProject.tasks.named('applyPatches')
+    }
+}
