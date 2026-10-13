@@ -185,7 +185,7 @@ public final class BlockBreakStructure implements Comparable<BlockBreakStructure
                                     || (
                                     (
                                             !useSolidBlockBetweenPowerBlockAndPiston
-                                                    || strongPoweringBlockByPowerBlockState.isSolidBlock(world, dependBlockPos)
+                                                    || strongPoweringBlockByPowerBlockState.isSolidBlock(world, strongPoweringBlockByPowerBlockPos)
                                     )
                                             && dependBlockState.isSideSolidFullSquare(world, dependBlockPos, powerBlockFace)
                             )
