@@ -195,7 +195,11 @@ public class Task implements Comparable<Task> {
             if (BlockUtils.playerCanTouchServerside(player, structure.getPistonPos(), 1, false)
                     && BlockUtils.playerCanTouchServerside(player, structure.getPowerBlockPos(), 1, false)
                     && BlockUtils.playerCanTouchServerside(player, structure.getDependBlockPos(), 1, false)
-                    && world.canPlace(Blocks.STONE.getDefaultState(), structure.getPistonPos(), ShapeContext.absent())
+                    // 这个 Stream 的每个元素都已经过 testBeforePlace 过滤，而那里已经对同一个位置、
+                    // 同一个 BlockState 和 ShapeContext 调过 world.canPlace，并且必须为真才会放行；
+                    // 一次搜索期间世界不会被修改，所以这里再调一次是纯重复的
+                    // （canPlace 内部会做实体碰撞扫描，并不便宜）。
+                    //&& world.canPlace(Blocks.STONE.getDefaultState(), structure.getPistonPos(), ShapeContext.absent())
                     // 当依赖方块是目标方块时，无法创建无头活塞
                     && (!BlockMinerMod.getInstance().getConfig().isHeadlessPistonMode() || !structure.getDependBlockPos().equals(targetPos))
                     // 保证依赖方块不会被其他task意外清除
