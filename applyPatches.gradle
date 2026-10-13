@@ -1,30 +1,100 @@
-// AI 生成的补丁自动应用：编译前把 patches/ 下的 .patch 依次 git apply。
-// 用法：把 .patch 放进 patches/，正常 ./gradlew build 即可。
-tasks.register('applyPatches') {
-    group = 'build'
-    description = 'Apply AI-generated .patch files from patches/ before compile'
-    doLast {
-        def patchDir = rootProject.file('patches')
-        if (!patchDir.exists()) { logger.lifecycle('[applyPatches] patches/ not found, skip'); return }
-        def patches = patchDir.listFiles({ d, n -> n.endsWith('.patch') } as FilenameFilter)?.sort()
-        if (!patches || patches.isEmpty()) { logger.lifecycle('[applyPatches] no patches, skip'); return }
-        logger.lifecycle("[applyPatches] ${patches.size()} patch(es) found")
-        patches.each { patch ->
-            logger.lifecycle("[applyPatches] applying ${patch.name}")
-            def r = exec { commandLine 'git', 'apply', '--3way', '--whitespace=fix', patch.absolutePath; ignoreExitValue = true }
-            if (r.exitValue != 0) {
-                def c = exec { commandLine 'git', 'apply', '--check', patch.absolutePath; ignoreExitValue = true }
-                if (c.exitValue != 0) throw new GradleException("[applyPatches] FAILED ${patch.name}")
-                logger.lifecycle("[applyPatches] ${patch.name} already applied, skip")
-            }
-        }
-        logger.lifecycle('[applyPatches] done')
-    }
+// === AI 生成补丁的合并（root 项目加载时做一次）===
+//
+// 设计目标：
+//   * 补丁只影响临时文件，仓库里的 src/ 永远不被改（git status 保持干净）
+//   * 只复制一次、只打一次补丁，不随子项目数量放大，也不影响 --parallel
+//
+// 做法（全部在配置阶段完成，没有额外的 task）：
+//   1. 复制 src/ -> build/ai-patched-src/src/，把 patches/*.patch 用
+//      `git apply --directory=build/ai-patched-src` 应用到副本上。每次都是全新副本，
+//      所以不存在"补丁已应用/上下文漂移"的问题。
+//   2. 把 **core 项目**（versions/mainProject 里写的那个，当前是 1.21.5）的 sourceSets
+//      指到副本。
+//
+// 为什么只改 core 一个项目就够（见 PreprocessPlugin.kt）：
+//   core 分支：  java.setSrcDirs(listOf(parent.file("src/$name/java")))   ← 直接编译共享 src
+//   其它分支：   entry(source = inherited.files(inheritedSourceSet.java.srcDirs), ...)
+//                                                                       ← 从 inherited 链式派生
+//   所有版本最终都从 core 的 srcDirs 派生，所以改一处就覆盖全部版本，
+//   不需要给 22 个子项目各复制一份。
+//
+// 注意：preprocessor 没有暴露 sourceSet / srcDirs 的 API（PreprocessExtension 只有
+// vars/keywords/patternAnnotation/manageImports，RootPreprocessExtension 只有
+// strictExtraMappings/createNode/link/mainProjectFile）。这里直接改 Gradle 的
+// SourceDirectorySet，依赖"插件把 java.srcDirs 当取源目录"这个实现细节，所以下面在
+// core 评估完之后立刻断言重定向生效：一旦插件改了取源方式，构建会响亮地失败，
+// 而不是静默地把没打补丁的代码编译出去。
+
+def mainProjectFile = rootProject.file('versions/mainProject')
+def coreProjectName = mainProjectFile.exists() ? mainProjectFile.text.trim() : null
+def patchedSrcRoot = new File(rootProject.layout.buildDirectory.get().asFile, 'ai-patched-src')
+
+// ---- 1. root 加载时：复制一次、打补丁一次 ----------------------------------
+rootProject.delete(patchedSrcRoot)
+patchedSrcRoot.mkdirs()
+rootProject.copy {
+    from rootProject.file('src')
+    into new File(patchedSrcRoot, 'src')
 }
 
-// 挂到所有版本子项目的 compileJava 之前（每个版本的源码是共享的 src/，所以补丁必须先应用）
-subprojects {
-    tasks.matching { it.name == 'compileJava' }.configureEach {
-        dependsOn rootProject.tasks.named('applyPatches')
+def patchDir = rootProject.file('patches')
+def patches = patchDir.exists()
+        ? (patchDir.listFiles({ d, n -> n.endsWith('.patch') } as FilenameFilter)?.sort() ?: [])
+        : []
+// 配置阶段不能用 Project.exec（Gradle 9 已移除），用 ProcessBuilder 直接跑。
+def runGitApply = { patchFile ->
+    def pb = new ProcessBuilder('git', 'apply',
+            '--directory=build/ai-patched-src',
+            '--whitespace=nowarn',
+            patchFile.absolutePath)
+    pb.directory(rootProject.projectDir)
+    pb.redirectErrorStream(true)
+    def proc = pb.start()
+    def out = proc.inputStream.getText('UTF-8')
+    def code = proc.waitFor()
+    return [code: code, out: out]
+}
+
+patches.each { patch ->
+    def result = runGitApply(patch)
+    if (result.code != 0) {
+        throw new GradleException("[applyPatches] failed to apply ${patch.name} (exit ${result.code}):\n" +
+                result.out + "\nThe patch must apply cleanly onto the current src/.")
+    }
+    logger.lifecycle("[applyPatches] applied ${patch.name}")
+}
+logger.lifecycle("[applyPatches] ${patches.size()} patch(es) applied to ${patchedSrcRoot} (src/ untouched)")
+
+// ---- 2. 把 core 项目的源码目录指到副本 --------------------------------------
+if (coreProjectName == null) {
+    logger.warn("[applyPatches] versions/mainProject not found, cannot redirect the core project")
+} else {
+    def core = rootProject.project(":$coreProjectName")
+
+    def redirectSourceSets = { p ->
+        p.sourceSets.configureEach { ss ->
+            def patchedJava = new File(patchedSrcRoot, "src/${ss.name}/java")
+            def patchedResources = new File(patchedSrcRoot, "src/${ss.name}/resources")
+            if (patchedJava.isDirectory()) ss.java.setSrcDirs([patchedJava])
+            if (patchedResources.isDirectory()) ss.resources.setSrcDirs([patchedResources])
+        }
+    }
+
+    // withPlugin 在插件 apply() 返回后立刻触发：那时插件已经把 srcDirs 设成共享 src，
+    // 而且还没有其它项目读过它（非 core 项目在 evaluationDependsOn 之后才读）。
+    core.pluginManager.withPlugin('com.replaymod.preprocess') { redirectSourceSets(core) }
+
+    // core 评估完之后只做断言，不再重新重定向：如果插件在 apply() 之后又动过 srcDirs，
+    // 这里会响亮地失败，而不是悄悄把没打补丁的代码编出去。
+    core.afterEvaluate {
+        def expected = new File(patchedSrcRoot, 'src/main/java').canonicalPath
+        def actual = core.sourceSets.main.java.srcDirs.collect { it.canonicalPath }
+        if (!actual.contains(expected)) {
+            throw new GradleException("""[applyPatches] :${core.name} is not compiling the patched sources.
+  expected in srcDirs: ${expected}
+  actual srcDirs      : ${actual}
+applyPatches.gradle relies on the preprocessor reading java.srcDirs; that may have changed.""")
+        }
+        logger.lifecycle("[applyPatches] core :${core.name} compiles ${expected}")
     }
 }
