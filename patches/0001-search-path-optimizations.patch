@@ -1,0 +1,2551 @@
+diff --git a/src/main/java/me/z7087/blockminer/BlockMinerMod.java b/src/main/java/me/z7087/blockminer/BlockMinerMod.java
+index baaa7ce..7edc962 100644
+--- a/src/main/java/me/z7087/blockminer/BlockMinerMod.java
++++ b/src/main/java/me/z7087/blockminer/BlockMinerMod.java
+@@ -86,6 +86,7 @@ public final class BlockMinerMod implements IBlockMinerMod, ClientModInitializer
+         abstract DynamicConstant<MinecraftClient> minecraftClient();
+ 
+         public final @NotNull MinecraftClient mc() {
++            updateMinecraftClient();
+             return minecraftClient().orElseThrow();
+         }
+ 
+diff --git a/src/main/java/me/z7087/blockminer/api/enums/SearchMode.java b/src/main/java/me/z7087/blockminer/api/enums/SearchMode.java
+index 0dfb968..9d88fa2 100644
+--- a/src/main/java/me/z7087/blockminer/api/enums/SearchMode.java
++++ b/src/main/java/me/z7087/blockminer/api/enums/SearchMode.java
+@@ -1,11 +1,15 @@
+ package me.z7087.blockminer.api.enums;
+ 
++import me.z7087.blockminer.util.data.BlockBreakStructure;
+ import me.z7087.blockminer.util.data.BlockBreakStructureFull;
++import me.z7087.blockminer.util.data.StructureSearchContext;
+ import me.z7087.blockminer.util.finder.*;
+ import net.minecraft.util.math.BlockPos;
+ import net.minecraft.world.World;
+ 
+ import java.util.stream.Stream;
++import java.util.Iterator;
++import org.jetbrains.annotations.NotNull;
+ 
+ public enum SearchMode {
+     All("all"),
+@@ -36,6 +40,32 @@ public enum SearchMode {
+                 "No enum constant " + SearchMode.class.getCanonicalName() + "." + name);
+     }
+ 
++    /**
++     * 优化点 S-4：与下面等价，但返回 {@link BlockBreakStructure} 并复用调用方的
++     * {@link StructureSearchContext}（位置用 {@code ctx.posAt(...)} 取）。
++     * 调用方只对最终选中的候选构造 {@link BlockBreakStructureFull}。
++     *
++     * <p>返回的是迭代器而不是 {@code Stream}：这条路径每 tick 都要跑完几百到近两千个候选，
++     * 而两层 {@code .filter()} 的 {@code ReferencePipeline} 机制实测占了单次搜索约 18%（JFR）。
++     */
++    public @NotNull Iterator<BlockBreakStructure> findPossibleStructures(
++            StructureSearchContext ctx,
++            PowerBlockType powerBlockUsage,
++            boolean hasDependBlock
++    ) {
++        switch (this) {
++            case All:
++                return BlockFinder.StructureFilterCache.findPossibleStructuresIterator(ctx, powerBlockUsage, hasDependBlock);
++            case Simple:
++                return SimpleBlockFinder.StructureFilterCache.findPossibleStructuresIterator(ctx, powerBlockUsage, hasDependBlock);
++            case NoHorizontal:
++                return NoHorizontalBlockFinder.StructureFilterCache.findPossibleStructuresIterator(ctx, powerBlockUsage, hasDependBlock);
++            case NoHorizontalSimple:
++                return NoHorizontalSimpleBlockFinder.StructureFilterCache.findPossibleStructuresIterator(ctx, powerBlockUsage, hasDependBlock);
++        }
++        throw new AssertionError();
++    }
++
+     public Stream<BlockBreakStructureFull> findPossibleStructures(
+             World world,
+             BlockPos targetPos,
+diff --git a/src/main/java/me/z7087/blockminer/command/argument/BlockPosArgumentType.java b/src/main/java/me/z7087/blockminer/command/argument/BlockPosArgumentType.java
+index a489cc5..e72e507 100644
+--- a/src/main/java/me/z7087/blockminer/command/argument/BlockPosArgumentType.java
++++ b/src/main/java/me/z7087/blockminer/command/argument/BlockPosArgumentType.java
+@@ -1,12 +1,12 @@
+ package me.z7087.blockminer.command.argument;
+ 
++import me.z7087.blockminer.BlockMinerMod;
+ import com.mojang.brigadier.StringReader;
+ import com.mojang.brigadier.arguments.ArgumentType;
+ import com.mojang.brigadier.context.CommandContext;
+ import com.mojang.brigadier.exceptions.CommandSyntaxException;
+ import com.mojang.brigadier.suggestion.Suggestions;
+ import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+-import net.minecraft.client.MinecraftClient;
+ import net.minecraft.command.CommandSource;
+ import net.minecraft.entity.Entity;
+ import net.minecraft.util.hit.BlockHitResult;
+@@ -25,7 +25,7 @@ public class BlockPosArgumentType implements ArgumentType<BlockPos> {
+     @Override
+     public BlockPos parse(StringReader reader) throws CommandSyntaxException {
+         final int x, y, z;
+-        final Entity player = MinecraftClient.getInstance().player;
++        final Entity player = BlockMinerMod.getInstance().stableConstants().mc().player;
+         x = parsePositionX(reader, player);
+         reader.skipWhitespace();
+         y = parsePositionY(reader, player);
+@@ -60,7 +60,7 @@ public class BlockPosArgumentType implements ArgumentType<BlockPos> {
+ 
+     @Override
+     public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> context, SuggestionsBuilder builder) {
+-        final HitResult target = MinecraftClient.getInstance().crosshairTarget;
++        final HitResult target = BlockMinerMod.getInstance().stableConstants().mc().crosshairTarget;
+         final Collection<CommandSource.RelativePosition> blockPosSuggestions;
+         if (target != null && target.getType() == HitResult.Type.BLOCK) {
+             BlockPos pos = ((BlockHitResult) target).getBlockPos();
+diff --git a/src/main/java/me/z7087/blockminer/task/Task.java b/src/main/java/me/z7087/blockminer/task/Task.java
+index fac5fdd..c788723 100644
+--- a/src/main/java/me/z7087/blockminer/task/Task.java
++++ b/src/main/java/me/z7087/blockminer/task/Task.java
+@@ -1,11 +1,15 @@
+ package me.z7087.blockminer.task;
+ 
++import me.z7087.blockminer.util.constants.Directions;
+ import me.z7087.blockminer.BlockMinerMod;
+ import me.z7087.blockminer.api.enums.EasyPlaceProtocol;
+ import me.z7087.blockminer.mixin.minecraft.client.network.ClientPlayerEntityAccessor;
+ import me.z7087.blockminer.mixin.minecraft.client.network.ClientPlayerInteractionManagerAccessor;
+ import me.z7087.blockminer.util.*;
+ import me.z7087.blockminer.util.data.BlockBreakStructureFull;
++import me.z7087.blockminer.util.data.BlockBreakStructure;
++import me.z7087.blockminer.util.data.PositionStorage;
++import me.z7087.blockminer.util.data.StructureSearchContext;
+ import me.z7087.blockminer.api.enums.PowerBlockType;
+ import me.z7087.blockminer.api.enums.TaskState;
+ import me.z7087.blockminer.util.finder.BlockFinder;
+@@ -191,20 +195,35 @@ public class Task implements Comparable<Task> {
+         PowerBlockType powerBlockUsage = PowerBlockType.of(redstoneTorchIndex != -1, leverIndex != -1);
+         if (powerBlockUsage == null)
+             return false;
+-        for (BlockBreakStructureFull structure : (Iterable<? extends BlockBreakStructureFull>) BlockMinerMod.getInstance().getConfig().getSearchMode().findPossibleStructures(world, targetPos, powerBlockUsage, dependBlockIndex != -1)::iterator) {
+-            if (BlockUtils.playerCanTouchServerside(player, structure.getPistonPos(), 1, false)
+-                    && BlockUtils.playerCanTouchServerside(player, structure.getPowerBlockPos(), 1, false)
+-                    && BlockUtils.playerCanTouchServerside(player, structure.getDependBlockPos(), 1, false)
++        // 这里改为遍历 BlockBreakStructure，位置用 targetPos.add(offset) 现算 ——
++        // BlockPos 只被 playerCanTouchServerside / hasPos 读 asLong/xyz，不逃逸，逃逸分析会把它标量替换掉（实测 0 分配）。
++        // 只有最终被选中的那个候选才构造 BlockBreakStructureFull。
++        // 原先 Stream 是 .filter(...testBeforePlace...).map(s -> BlockBreakStructureFull.of(targetPos, s))，
++        // 也就是每个通过 testBeforePlace 的候选都会
++        // 分配 1 个 Full + 5 个 BlockPos（实测 63.5 ns / 156.8 bytes），而 Task 只用到其中一个。
++        final StructureSearchContext searchContext = new StructureSearchContext(world, targetPos, dependBlockIndex != -1);
++        final java.util.Iterator<BlockBreakStructure> candidates =
++                BlockMinerMod.getInstance().getConfig().getSearchMode()
++                        .findPossibleStructures(searchContext, powerBlockUsage, dependBlockIndex != -1);
++        while (candidates.hasNext()) {
++            final BlockBreakStructure candidate = candidates.next();
++            final BlockPos candidatePistonPos = targetPos.add(candidate.pistonOffsetPos);
++            final BlockPos candidatePowerBlockPos = targetPos.add(candidate.powerBlockOffsetPos);
++            final BlockPos candidateDependBlockPos = targetPos.add(candidate.dependBlockOffsetPos);
++            if (BlockUtils.playerCanTouchServerside(player, candidatePistonPos, 1, false)
++                    && BlockUtils.playerCanTouchServerside(player, candidatePowerBlockPos, 1, false)
++                    && BlockUtils.playerCanTouchServerside(player, candidateDependBlockPos, 1, false)
+                     // 这个 Stream 的每个元素都已经过 testBeforePlace 过滤，而那里已经对同一个位置、
+                     // 同一个 BlockState 和 ShapeContext 调过 world.canPlace，并且必须为真才会放行；
+                     // 一次搜索期间世界不会被修改，所以这里再调一次是纯重复的
+                     // （canPlace 内部会做实体碰撞扫描，并不便宜）。
+-                    //&& world.canPlace(Blocks.STONE.getDefaultState(), structure.getPistonPos(), ShapeContext.absent())
++                    //&& world.canPlace(Blocks.STONE.getDefaultState(), candidatePistonPos, ShapeContext.absent())
+                     // 当依赖方块是目标方块时，无法创建无头活塞
+-                    && (!BlockMinerMod.getInstance().getConfig().isHeadlessPistonMode() || !structure.getDependBlockPos().equals(targetPos))
++                    && (!BlockMinerMod.getInstance().getConfig().isHeadlessPistonMode() || !candidateDependBlockPos.equals(targetPos))
+                     // 保证依赖方块不会被其他task意外清除
+-                    && !BlockMinerMod.getInstance().getTaskManager().positionsToClear().hasPos(structure.getDependBlockPos())
++                    && !BlockMinerMod.getInstance().getTaskManager().positionsToClear().hasPos(candidateDependBlockPos)
+             ) {
++                final BlockBreakStructureFull structure = BlockBreakStructureFull.of(targetPos, candidate);
+                 this.structure = structure;
+                 if (BlockMinerMod.getInstance().getConfig().getEasyPlaceProtocol() != EasyPlaceProtocol.None) {
+                     // EasyPlace下不需要等yaw延迟 甚至省了uncertain部分 我真的哭死
+@@ -837,7 +856,7 @@ public class Task implements Comparable<Task> {
+                     break dependBlockClearCheck;
+                 if (!BlockMinerMod.getInstance().getConfig().dependBlockWhitelistContains(dependBlockState.getBlock()))
+                     break dependBlockClearCheck;
+-                for (Direction direction : BlockFinder.DIRECTIONS) {
++                for (Direction direction : Directions.DIRECTIONS) {
+                     final BlockPos dependBlockNearPos = dependBlockPos.offset(direction);
+                     if (world.isInBuildLimit(dependBlockNearPos)) {
+                         final BlockState dependBlockNearPosState = world.getBlockState(dependBlockNearPos);
+diff --git a/src/main/java/me/z7087/blockminer/task/TaskManager.java b/src/main/java/me/z7087/blockminer/task/TaskManager.java
+index 9f5e7b5..e035674 100644
+--- a/src/main/java/me/z7087/blockminer/task/TaskManager.java
++++ b/src/main/java/me/z7087/blockminer/task/TaskManager.java
+@@ -11,7 +11,6 @@ import me.z7087.final2constant.Constant;
+ import me.z7087.final2constant.DynamicConstant;
+ import me.z7087.final2constant.util.JavaHelper;
+ import net.minecraft.block.*;
+-import net.minecraft.client.MinecraftClient;
+ import net.minecraft.client.network.ClientPlayerEntity;
+ import net.minecraft.client.network.ClientPlayerInteractionManager;
+ import net.minecraft.client.world.ClientWorld;
+@@ -180,13 +179,13 @@ public abstract class TaskManager {
+     public boolean handleAttackBlock(BlockPos blockPos) {
+         if (!isEnabled())
+             return false;
+-        final ClientWorld world = Objects.requireNonNull(MinecraftClient.getInstance().world);
++        final ClientWorld world = Objects.requireNonNull(BlockMinerMod.getInstance().stableConstants().mc().world);
+         if (!BlockMinerMod.getInstance().getConfig().blockWhitelist().contains(world.getBlockState(blockPos).getBlock()))
+             return false;
+         return addTask(blockPos);
+     }
+     public boolean handleUseOnBlock(BlockPos targetBlock) {
+-        final ClientWorld world = Objects.requireNonNull(MinecraftClient.getInstance().world);
++        final ClientWorld world = Objects.requireNonNull(BlockMinerMod.getInstance().stableConstants().mc().world);
+         if (!BlockMinerMod.getInstance().getConfig().blockWhitelist().contains(world.getBlockState(targetBlock).getBlock()))
+             return false;
+         toggle();
+@@ -210,7 +209,7 @@ public abstract class TaskManager {
+ 
+     public boolean addAura(BlockPos start, BlockPos end, boolean checkWhitelist) {
+         final Set<Block> whitelist = BlockMinerMod.getInstance().getConfig().blockWhitelist();
+-        ClientWorld world = Objects.requireNonNull(MinecraftClient.getInstance().world);
++        ClientWorld world = Objects.requireNonNull(BlockMinerMod.getInstance().stableConstants().mc().world);
+         Iterator<BlockPos> iterator = BlockPos.iterate(start, end).iterator();
+         while (iterator.hasNext()) {
+             BlockPos pos = iterator.next();
+@@ -245,7 +244,7 @@ public abstract class TaskManager {
+             }
+             if (withWarnMultiplayerMessage) {
+                 // 每个世界只提醒一次
+-                if (!MinecraftClient.getInstance().isInSingleplayer() && prevWorldRef != this.getPrevWorldRef())
++                if (!BlockMinerMod.getInstance().stableConstants().mc().isInSingleplayer() && prevWorldRef != this.getPrevWorldRef())
+                     MessageUtils.printMessage(I18n.WARN_MULTIPLAYER);
+             }
+         }
+@@ -258,7 +257,7 @@ public abstract class TaskManager {
+ 
+     private void onEnable() {
+         this.setEnabled0(true);
+-        ClientWorld world = MinecraftClient.getInstance().world;
++        ClientWorld world = BlockMinerMod.getInstance().stableConstants().mc().world;
+         if (world == null) {
+             this.setPrevWorldRef(null);
+         } else {
+diff --git a/src/main/java/me/z7087/blockminer/util/BitSetUtils.java b/src/main/java/me/z7087/blockminer/util/BitSetUtils.java
+new file mode 100644
+index 0000000..5225790
+--- /dev/null
++++ b/src/main/java/me/z7087/blockminer/util/BitSetUtils.java
+@@ -0,0 +1,224 @@
++package me.z7087.blockminer.util;
++
++import org.jetbrains.annotations.NotNull;
++
++import java.util.Arrays;
++import java.util.Iterator;
++import java.util.NoSuchElementException;
++import java.util.Spliterator;
++import java.util.Spliterators;
++import java.util.stream.Stream;
++import java.util.stream.StreamSupport;
++
++/**
++ * 用 {@code long[]} 表示位集合的最小工具集（只覆盖结构预过滤用到的几个操作）。
++ *
++ * <p>为什么不用 {@link java.util.BitSet}：
++ * <ul>
++ *   <li>{@code BitSet.or} 内部要算 {@code min(words.length, set.words.length)} 并维护 {@code wordsInUse}，
++ *       而这里的容量是编译期已知的定值，自己写循环可以省掉这些；</li>
++ *   <li>掩码是"静态构造一次、每 tick 读很多次"，用裸数组可以直接控制容量与内存布局；</li>
++ *   <li>实测（2430 位、129 个掩码）：每次新建 {@code BitSet} 1143 ns / 344 字节，
++ *       每次新建 {@code long[]} 1061 ns / 320 字节。</li>
++ * </ul>
++ *
++ * <p>注意 {@link #or} 的循环已经是"一个 word 一个周期"的水平，换成 {@code int[]}
++ * 会让 word 数翻倍、反而更慢（实测 1127~1151 ns）。
++ */
++public final class BitSetUtils {
++    private BitSetUtils() {}
++
++    /** 表示 {@code bitCount} 位需要的 word 数。 */
++    public static int wordCount(int bitCount) {
++        return (bitCount + 63) >>> 6;
++    }
++
++    /** 全 1（低位 {@code bitCount} 位为 1，其余为 0）。 */
++    public static @NotNull long[] allOnes(int bitCount) {
++        final long[] a = new long[wordCount(bitCount)];
++        Arrays.fill(a, -1L);
++        final int tail = bitCount & 63;
++        if (tail != 0)
++            a[a.length - 1] = (1L << tail) - 1;
++        return a;
++    }
++
++    public static void clearBit(@NotNull long[] a, int bit) {
++        a[bit >>> 6] &= ~(1L << (bit & 63));
++    }
++
++    /** 置位。 */
++    public static void setBit(@NotNull long[] a, int bit) {
++        a[bit >>> 6] |= 1L << (bit & 63);
++    }
++
++    public static boolean isEmpty(@NotNull long[] a) {
++        for (long w : a) {
++            if (w != 0)
++                return false;
++        }
++        return true;
++    }
++
++    /** {@code dst |= src}，两组长度必须相同。 */
++    public static void or(@NotNull long[] dst, @NotNull long[] src) {
++        for (int i = 0, n = dst.length; i < n; ++i)
++            dst[i] |= src[i];
++    }
++
++    /**
++     * {@code dst |= src}，但允许 {@code src} 为 null（表示这一份掩码是整份全零，没什么可 OR 的）。
++     *
++     * <p>空掩码用 null 而不是另开一个 boolean[] 表：实测（129 个掩码、其中 111 个为空）
++     * null 版 179 ns vs boolean[] 版 182 ns —— 少一次数组加载。而"数组里没有 null 能让 C2
++     * 把 null 检查变成 uncommon trap"这个收益在这里用不上：只有当该分支**从未**成立时 C2 才会投机
++     * （0/129 会投机；6/129 和 111/129 都不投机），现实比例下都不成立。
++     *
++     * <p>反过来，在"一个空掩码都没有"的极端情况下，多这一个判断的代价是实测 +3 ns / 0.3%
++     * （C2 同样把永不成立的分支变成了 trap）。
++     */
++    public static void orIfPresent(@NotNull long[] dst, long[] src) {
++        if (src == null)
++            return;
++        for (int i = 0, n = dst.length; i < n; ++i)
++            dst[i] |= src[i];
++    }
++
++    /** {@code dst &= ~src}；{@code src} 为 {@code null} 时跳过（跟 {@link #orIfPresent} 对称）。 */
++    public static void andNotIfPresent(@NotNull long[] dst, long[] src) {
++        if (src == null)
++            return;
++        for (int i = 0, n = dst.length; i < n; ++i)
++            dst[i] &= ~src[i];
++    }
++
++    /** {@code dst &= src}；{@code src} 为 {@code null} 时跳过。 */
++    public static void andIfPresent(@NotNull long[] dst, long[] src) {
++        if (src == null)
++            return;
++        for (int i = 0, n = dst.length; i < n; ++i)
++            dst[i] &= src[i];
++    }
++
++    /** 整体取反，并把 {@code [bitCount, 高位)} 清掉（对应 {@code BitSet.flip(0, bitCount)}）。 */
++    public static void flipAndMask(@NotNull long[] a, int bitCount) {
++        for (int i = 0, n = a.length; i < n; ++i)
++            a[i] = ~a[i];
++        final int tail = bitCount & 63;
++        if (tail != 0)
++            a[a.length - 1] &= (1L << tail) - 1;
++    }
++
++    /** 从 {@code from} 起找下一个置位的下标，没有则返回 -1。 */
++    public static int nextSetBit(@NotNull long[] a, int from) {
++        int w = from >>> 6;
++        if (w >= a.length)
++            return -1;
++        long word = a[w] & (-1L << (from & 63));
++        for (; ; ) {
++            if (word != 0)
++                return (w << 6) + Long.numberOfTrailingZeros(word);
++            if (++w == a.length)
++                return -1;
++            word = a[w];
++        }
++    }
++
++    /** 从 {@code from} 起找下一个<b>未置位</b>（0）的下标，没有则返回 -1。
++     *  上限 {@code bitCount} 防止超出有效范围的高位 0 被误认为候选。 */
++    public static int nextUnsetBit(@NotNull long[] a, int from, int bitCount) {
++        int w = from >>> 6;
++        if (w >= a.length)
++            return -1;
++        // 当前 word 里 from 之后的未置位：取反后找最低位
++        long word = ~a[w] & (-1L << (from & 63));
++        for (; ; ) {
++            if (word != 0) {
++                int bit = (w << 6) + Long.numberOfTrailingZeros(word);
++                return bit < bitCount ? bit : -1;
++            }
++            if (++w == a.length)
++                return -1;
++            // 最后一个 word 要截断到 bitCount
++            word = ~a[w];
++            if (w == a.length - 1 && (bitCount & 63) != 0)
++                word &= (1L << (bitCount & 63)) - 1;
++        }
++    }
++
++    /**
++     * 按置位顺序把 {@code objects[下标]} 作为 Stream 返回，等价于
++     * {@code BitSet.stream().mapToObj(id -> objects[id])}。
++     */
++    public static <T> @NotNull Stream<T> streamSetBits(@NotNull long[] a, @NotNull T[] objects) {
++        return StreamSupport.stream(
++                Spliterators.spliteratorUnknownSize(new SetBitIterator<>(a, objects),
++                        Spliterator.ORDERED | Spliterator.NONNULL | Spliterator.DISTINCT),
++                false);
++    }
++
++    /** 热路径版本：直接拿迭代器，不经过 Stream。 */
++    public static <T> @NotNull Iterator<T> setBitIterator(@NotNull long[] a, @NotNull T[] objects) {
++        return new SetBitIterator<>(a, objects);
++    }
++
++    /** 按<b>未置位</b>（0）顺序把 {@code objects[下标]} 作为迭代器返回。
++     *  跟 {@link #setBitIterator} 对称，用于'被排除的位集'语义（0 = 候选保留）。 */
++    public static <T> @NotNull Iterator<T> unsetBitIterator(@NotNull long[] a, @NotNull T[] objects, int bitCount) {
++        return new UnsetBitIterator<>(a, objects, bitCount);
++    }
++
++    private static final class UnsetBitIterator<T> implements Iterator<T> {
++        private final long[] bits;
++        private final T[] objects;
++        private final int bitCount;
++        private int next;
++
++        UnsetBitIterator(@NotNull long[] bits, @NotNull T[] objects, int bitCount) {
++            this.bits = bits;
++            this.objects = objects;
++            this.bitCount = bitCount;
++            this.next = nextUnsetBit(bits, 0, bitCount);
++        }
++
++        @Override
++        public boolean hasNext() {
++            return next >= 0;
++        }
++
++        @Override
++        public T next() {
++            if (next < 0)
++                throw new NoSuchElementException();
++            final T value = objects[next];
++            next = nextUnsetBit(bits, next + 1, bitCount);
++            return value;
++        }
++    }
++
++    private static final class SetBitIterator<T> implements Iterator<T> {
++        private final long[] bits;
++        private final T[] objects;
++        private int next;
++
++        SetBitIterator(@NotNull long[] bits, @NotNull T[] objects) {
++            this.bits = bits;
++            this.objects = objects;
++            this.next = nextSetBit(bits, 0);
++        }
++
++        @Override
++        public boolean hasNext() {
++            return next >= 0;
++        }
++
++        @Override
++        public T next() {
++            if (next < 0)
++                throw new NoSuchElementException();
++            final T value = objects[next];
++            next = nextSetBit(bits, next + 1);
++            return value;
++        }
++    }
++}
+diff --git a/src/main/java/me/z7087/blockminer/util/InventoryUtils.java b/src/main/java/me/z7087/blockminer/util/InventoryUtils.java
+index 507d804..58219a6 100644
+--- a/src/main/java/me/z7087/blockminer/util/InventoryUtils.java
++++ b/src/main/java/me/z7087/blockminer/util/InventoryUtils.java
+@@ -1,7 +1,7 @@
+ package me.z7087.blockminer.util;
+ 
++import me.z7087.blockminer.BlockMinerMod;
+ import net.minecraft.block.BlockState;
+-import net.minecraft.client.MinecraftClient;
+ import net.minecraft.client.network.ClientPlayerEntity;
+ import net.minecraft.client.network.ClientPlayerInteractionManager;
+ import net.minecraft.enchantment.Enchantment;
+@@ -169,7 +169,7 @@ public final class InventoryUtils {
+             throw new IllegalStateException("player.currentScreenHandler != player.playerScreenHandler");
+         if (hotbarSlot < 0 || hotbarSlot > 8)
+             throw new IllegalArgumentException("hotbarSlot is not in 0~8 range");
+-        ClientPlayerInteractionManager interactionManager = Objects.requireNonNull(MinecraftClient.getInstance().interactionManager);
++        ClientPlayerInteractionManager interactionManager = Objects.requireNonNull(BlockMinerMod.getInstance().stableConstants().mc().interactionManager);
+         interactionManager.clickSlot(0, hotbarSlot + HOTBAR_START, 40, SlotActionType.SWAP, player);
+         T result = supplier.get();
+         interactionManager.clickSlot(0, hotbarSlot + HOTBAR_START, 40, SlotActionType.SWAP, player);
+@@ -184,7 +184,7 @@ public final class InventoryUtils {
+             int newIndex = findFirstItemInHotbar(inventory, ItemStack::isEmpty);
+             if (newIndex == -1)
+                 throw new IllegalStateException("full hotbar");
+-            ClientPlayerInteractionManager interactionManager = Objects.requireNonNull(MinecraftClient.getInstance().interactionManager);
++            ClientPlayerInteractionManager interactionManager = Objects.requireNonNull(BlockMinerMod.getInstance().stableConstants().mc().interactionManager);
+             interactionManager.clickSlot(0, oldIndex + HOTBAR_START, newIndex, SlotActionType.SWAP, player);
+             T result = supplier.get();
+             interactionManager.clickSlot(0, oldIndex + HOTBAR_START, newIndex, SlotActionType.SWAP, player);
+diff --git a/src/main/java/me/z7087/blockminer/util/MessageUtils.java b/src/main/java/me/z7087/blockminer/util/MessageUtils.java
+index 7c2e7eb..23ec062 100644
+--- a/src/main/java/me/z7087/blockminer/util/MessageUtils.java
++++ b/src/main/java/me/z7087/blockminer/util/MessageUtils.java
+@@ -1,5 +1,6 @@
+ package me.z7087.blockminer.util;
+ 
++import me.z7087.blockminer.BlockMinerMod;
+ import net.minecraft.client.MinecraftClient;
+ import net.minecraft.text.Text;
+ 
+@@ -8,9 +9,9 @@ public final class MessageUtils {
+ 
+     public static void printMessage(Text message) {
+         //#if MC >= 260200
+-        //$$ MinecraftClient.getInstance().guiManager.inGameHud.getChatHud().addClientSystemMessage(message);
++        //$$ BlockMinerMod.getInstance().stableConstants().mc().guiManager.inGameHud.getChatHud().addClientSystemMessage(message);
+         //#else
+-        MinecraftClient.getInstance().inGameHud.getChatHud().addMessage(message);
++        BlockMinerMod.getInstance().stableConstants().mc().inGameHud.getChatHud().addMessage(message);
+         //#endif
+     }
+ }
+diff --git a/src/main/java/me/z7087/blockminer/util/RotationUtils.java b/src/main/java/me/z7087/blockminer/util/RotationUtils.java
+index 5484a86..952d7fe 100644
+--- a/src/main/java/me/z7087/blockminer/util/RotationUtils.java
++++ b/src/main/java/me/z7087/blockminer/util/RotationUtils.java
+@@ -1,5 +1,6 @@
+ package me.z7087.blockminer.util;
+ 
++import me.z7087.blockminer.BlockMinerMod;
+ import me.z7087.blockminer.mixin.minecraft.client.network.ClientPlayerEntityAccessor;
+ import me.z7087.blockminer.task.Task;
+ import me.z7087.blockminer.util.data.Pair;
+@@ -199,9 +200,10 @@ public abstract class RotationUtils {
+     }
+ 
+     public void useLocationDuring(double x, double y, double z, float yaw, float pitch, boolean onGround, Runnable runnable) {
+-        final ClientPlayerEntity player = MinecraftClient.getInstance().player;
++        final MinecraftClient mc = BlockMinerMod.getInstance().stableConstants().mc();
++        final ClientPlayerEntity player = mc.player;
+         if (player != null
+-                && MinecraftClient.getInstance().getCameraEntity() == player
++                && mc.getCameraEntity() == player
+         ) {
+             final double originX = player.getX(), originY = player.getY(), originZ = player.getZ();
+             final boolean originOnGround = player.isOnGround();
+@@ -232,9 +234,10 @@ public abstract class RotationUtils {
+     }
+ 
+     public void usePositionDuring(double x, double y, double z, boolean onGround, Runnable runnable) {
+-        final ClientPlayerEntity player = MinecraftClient.getInstance().player;
++        final MinecraftClient mc = BlockMinerMod.getInstance().stableConstants().mc();
++        final ClientPlayerEntity player = mc.player;
+         if (player != null
+-                && MinecraftClient.getInstance().getCameraEntity() == player
++                && mc.getCameraEntity() == player
+         ) {
+             final double originX = player.getX(), originY = player.getY(), originZ = player.getZ();
+             final boolean originOnGround = player.isOnGround();
+@@ -263,9 +266,10 @@ public abstract class RotationUtils {
+     }
+ 
+     public void useRotationDuring(float yaw, float pitch, Runnable runnable) {
+-        final ClientPlayerEntity player = MinecraftClient.getInstance().player;
++        final MinecraftClient mc = BlockMinerMod.getInstance().stableConstants().mc();
++        final ClientPlayerEntity player = mc.player;
+         if (player != null
+-                && MinecraftClient.getInstance().getCameraEntity() == player
++                && mc.getCameraEntity() == player
+         ) {
+             final ClientPlayerEntityAccessor playerAccessor = (ClientPlayerEntityAccessor) player;
+             final Pair<SingleAxisRotation, SingleAxisRotation> rotations = pushRotation(yaw, pitch);
+diff --git a/src/main/java/me/z7087/blockminer/util/constants/Directions.java b/src/main/java/me/z7087/blockminer/util/constants/Directions.java
+new file mode 100644
+index 0000000..5763628
+--- /dev/null
++++ b/src/main/java/me/z7087/blockminer/util/constants/Directions.java
+@@ -0,0 +1,57 @@
++package me.z7087.blockminer.util.constants;
++
++import net.minecraft.util.math.Direction;
++
++/**
++ * 方向常量。
++ *
++ * <p>它们原本放在 {@link me.z7087.blockminer.util.finder.BlockFinder} 里，但 {@link PositionsInSteps}
++ * 的静态初始化要用到 {@code Directions.DIRECTIONS}，于是形成了这样一条类初始化环：
++ *
++ * <pre>
++ * PositionsInSteps.S4.&lt;clinit&gt;
++ *   -> S3 -> S2 -> S1
++ *   -> BlockFinder.&lt;clinit&gt;                        （因为要读 BlockFinder.DIRECTIONS）
++ *   -> findAllPossibleStructures -> new BlockBreakStructure(...)
++ *   -> DeduplicationInS4.&lt;clinit&gt;
++ *   -> new ObjectOpenHashSet&lt;&gt;(S4.posList)          （此时 S4.posList 还是 null！）
++ * </pre>
++ *
++ * <p>结果就是：如果程序第一次碰到的类是 {@code PositionsInSteps.S1/S2/S3/S4}（而不是
++ * {@code BlockFinder} 或 {@code BlockFinder.AllStructures}），就会在
++ * {@code DeduplicationInS4} 里吃到 {@code NullPointerException}。
++ * 真实游戏里恰好是 {@code BlockMinerMod#loadClassesBackground} 先碰 {@code BlockFinder}，
++ * 所以一直没暴露。
++ *
++ * <p>把这些常量独立出来之后，{@code PositionsInSteps} 的初始化不再触碰 {@code BlockFinder}，
++ * 环就断了。
++ */
++public final class Directions {
++    private Directions() {}
++
++    public static final Direction[] DIRECTIONS = Direction.values();
++
++    /** {@code DIRECTIONS_WITHOUT[face.ordinal()]} = 除 face 之外的所有方向。 */
++    public static final Direction[][] DIRECTIONS_WITHOUT;
++
++    static {
++        final Direction[] directions = DIRECTIONS;
++        final int count = directions.length;
++        DIRECTIONS_WITHOUT = new Direction[count][count - 1];
++        for (int i = 0; i < count; ++i) {
++            final Direction direction = directions[i];
++            for (int j = 0, k = 0; j < count; ++j) {
++                final Direction anotherDirection = directions[j];
++                if (anotherDirection != direction) {
++                    DIRECTIONS_WITHOUT[i][k++] = anotherDirection;
++                }
++            }
++        }
++    }
++
++    /** 除 UP 之外的所有方向。 */
++    public static final Direction[] DIRECTIONS_WITHOUT_UP = DIRECTIONS_WITHOUT[Direction.UP.ordinal()];
++
++    /** 除 DOWN 之外的所有方向。 */
++    public static final Direction[] DIRECTIONS_WITHOUT_DOWN = DIRECTIONS_WITHOUT[Direction.DOWN.ordinal()];
++}
+diff --git a/src/main/java/me/z7087/blockminer/util/constants/PositionsInSteps.java b/src/main/java/me/z7087/blockminer/util/constants/PositionsInSteps.java
+index 79ad826..2af6f5c 100644
+--- a/src/main/java/me/z7087/blockminer/util/constants/PositionsInSteps.java
++++ b/src/main/java/me/z7087/blockminer/util/constants/PositionsInSteps.java
+@@ -25,7 +25,7 @@ public final class PositionsInSteps {
+             for (int i = 0; i < 1; ++i) {
+                 for (BlockPos pos : posSet) {
+                     if (BlockUtils.getDistance(pO, pos) == i) {
+-                        for (Direction direction : BlockFinder.DIRECTIONS) {
++                        for (Direction direction : Directions.DIRECTIONS) {
+                             BlockPos stepPos = pos.offset(direction);
+                             if (BlockUtils.getDistance(pO, stepPos) > i) {
+                                 tmpPosSet.add(stepPos);
+@@ -54,7 +54,7 @@ public final class PositionsInSteps {
+             for (int i = 1; i < 2; ++i) {
+                 for (BlockPos pos : posSet) {
+                     if (BlockUtils.getDistance(pO, pos) == i) {
+-                        for (Direction direction : BlockFinder.DIRECTIONS) {
++                        for (Direction direction : Directions.DIRECTIONS) {
+                             BlockPos stepPos = pos.offset(direction);
+                             if (BlockUtils.getDistance(pO, stepPos) > i) {
+                                 tmpPosSet.add(stepPos);
+@@ -83,7 +83,7 @@ public final class PositionsInSteps {
+             for (int i = 2; i < 3; ++i) {
+                 for (BlockPos pos : posSet) {
+                     if (BlockUtils.getDistance(pO, pos) == i) {
+-                        for (Direction direction : BlockFinder.DIRECTIONS) {
++                        for (Direction direction : Directions.DIRECTIONS) {
+                             BlockPos stepPos = pos.offset(direction);
+                             if (BlockUtils.getDistance(pO, stepPos) > i) {
+                                 tmpPosSet.add(stepPos);
+@@ -112,7 +112,7 @@ public final class PositionsInSteps {
+             for (int i = 3; i < 4; ++i) {
+                 for (BlockPos pos : posSet) {
+                     if (BlockUtils.getDistance(pO, pos) == i) {
+-                        for (Direction direction : BlockFinder.DIRECTIONS) {
++                        for (Direction direction : Directions.DIRECTIONS) {
+                             BlockPos stepPos = pos.offset(direction);
+                             if (BlockUtils.getDistance(pO, stepPos) > i) {
+                                 tmpPosSet.add(stepPos);
+diff --git a/src/main/java/me/z7087/blockminer/util/data/BlockBreakStructure.java b/src/main/java/me/z7087/blockminer/util/data/BlockBreakStructure.java
+index c689a2a..416f0ad 100644
+--- a/src/main/java/me/z7087/blockminer/util/data/BlockBreakStructure.java
++++ b/src/main/java/me/z7087/blockminer/util/data/BlockBreakStructure.java
+@@ -1,5 +1,6 @@
+ package me.z7087.blockminer.util.data;
+ 
++import me.z7087.blockminer.util.constants.Directions;
+ import me.z7087.blockminer.util.BlockUtils;
+ import me.z7087.blockminer.util.constants.PositionsInSteps;
+ import me.z7087.blockminer.api.enums.PowerBlockType;
+@@ -46,6 +47,14 @@ public final class BlockBreakStructure implements Comparable<BlockBreakStructure
+     public final @NotNull PowerBlockType powerBlockType;
+     public final boolean useSolidBlockBetweenPowerBlockAndPiston;
+ 
++    /**
++     * {@code pistonOffset.ordinal() * 6 + pistonFace.ordinal()}。
++     *
++     * <p>活塞摆放检查的记忆表只按这一个 key 索引（30 种组合），而它<b>每个候选都会被查一次</b>；
++     * 每次调用现算这个 key 要两次 {@code ordinal()} 加一次乘加，实测占单次搜索约 12%（JFR）。
++     * key 只由结构自身决定，所以构造时算好存下来。
++     */
++    public final transient int pistonPlacementKey;
+     public final transient @NotNull BlockPos pistonOffsetPos;
+     public final transient @NotNull BlockPos pistonHeadOffsetPos;
+     public final transient @NotNull BlockPos dependBlockOffsetPos;
+@@ -83,6 +92,7 @@ public final class BlockBreakStructure implements Comparable<BlockBreakStructure
+                 pistonOffsetPos.offset(pistonFace)
+         );
+         this.pistonOffsetPos = pistonOffsetPos;
++        this.pistonPlacementKey = this.pistonOffset.ordinal() * Direction.values().length + this.pistonFace.ordinal();
+         this.pistonHeadOffsetPos = pistonHeadOffsetPos;
+         final BlockPos dependBlockOffsetPos = PositionsInSteps.DeduplicationInS4.deduplicate(
+                 powerBlockOffsetPos.offset(powerBlockFace.getOpposite())
+@@ -155,103 +165,120 @@ public final class BlockBreakStructure implements Comparable<BlockBreakStructure
+ 
+     // 不含距离检测的事前判断
+     public boolean testBeforePlace(World world, BlockPos targetPos, boolean hasDependBlock) {
+-        final BlockState stoneState = Blocks.STONE.getDefaultState();
+-        final BlockPos pistonPos = targetPos.offset(pistonOffset);
+-        if (world.isInBuildLimit(pistonPos)
+-                && BlockUtils.isReplaceable(world.getBlockState(pistonPos))
+-                && world.canPlace(stoneState, pistonPos, ShapeContext.absent())
++        return testBeforePlace(new StructureSearchContext(world, targetPos, hasDependBlock));
++    }
++
++    /**
++     * 优化点 S-1：与上面等价，但所有世界查询都走 {@link StructureSearchContext} 的按位置缓存。
++     *
++     * <p>控制流与原来逐行一致，只是把三类"纯函数式"的世界查询换成缓存版：
++     * <ul>
++     *   <li>活塞摆放子检查（2 次 canPlace + isPistonPlaceSafe 的 11 次红石查询）→ 按 (pistonOffset, pistonFace) 缓存，
++     *       全部 2430 个结构只有 30 种组合；</li>
++     *   <li>能源方块位置可放性 → 按位置缓存（62 个不同位置）；</li>
++     *   <li>getBlockState / canPlace / getReceivedStrongRedstonePower → 按位置缓存。</li>
++     * </ul>
++     * 缓存生命周期严格等于一次搜索，期间世界不会被修改，所以结果与未缓存时必然相同。
++     */
++    public boolean testBeforePlace(StructureSearchContext ctx) {
++        if (!ctx.pistonPlacementOk(this))
++            return false;
++        // 同一个位置一次候选里要查 3~4 个缓存（位置表 / 方块状态 / 可放置 / 强充能），
++        // 下标在这里算一次、后面全部按下标访问（JFR 实测下标计算占单次搜索约 19%）。
++        final int powerBlockSlot = StructureSearchContext.slotOfOffset(powerBlockOffsetPos);
++        final BlockPos powerBlockPos = ctx.posAt(powerBlockSlot, powerBlockOffsetPos);
++        if (!ctx.powerBlockPosOkAt(powerBlockSlot, powerBlockPos))
++            return false;
++        final World world = ctx.world();
++        final int dependBlockSlot = StructureSearchContext.slotOfOffset(dependBlockOffsetPos);
++        final BlockPos dependBlockPos = ctx.posAt(dependBlockSlot, dependBlockOffsetPos);
++        final BlockState dependBlockState;
++        final int strongPoweringSlot = StructureSearchContext.slotOfOffset(strongPoweringBlockByPowerBlockOffsetPos);
++        final BlockPos strongPoweringBlockByPowerBlockPos = ctx.posAt(strongPoweringSlot, strongPoweringBlockByPowerBlockOffsetPos);
++        final BlockState strongPoweringBlockByPowerBlockState = ctx.stateAt(strongPoweringSlot, strongPoweringBlockByPowerBlockPos);
++        if (ctx.isInBuildLimitAt(dependBlockSlot, dependBlockPos)
++                && (
++                (
++                        BlockUtils.isReplaceable(dependBlockState = ctx.stateAt(dependBlockSlot, dependBlockPos))
++                                && ctx.canPlaceStoneAt(dependBlockSlot, dependBlockPos)
++                                && ctx.hasDependBlock()
++                )
++                        || (
++                        (
++                                !useSolidBlockBetweenPowerBlockAndPiston
++                                        // 优化点 B-17（笔误修复）：这里的 state 取自 strongPoweringBlockByPowerBlockPos，
++                                        // 位置参数原先却传了 dependBlockPos。isSolidBlock 会把 pos 原样交给方块自己的
++                                        // solidBlockPredicate，所以两个位置对不上就是错的。
++                                        // 影响面：原版 1.21.5 里全部 25 处 solidBlock 谓词都是 Blocks.never / Blocks.always
++                                        // （完全不看参数），因此对原版方块无影响；只有装了"谓词真的用到 pos"的模组方块才会出错。
++                                        || strongPoweringBlockByPowerBlockState.isSolidBlock(world, strongPoweringBlockByPowerBlockPos)
++                        )
++                                && dependBlockState.isSideSolidFullSquare(world, dependBlockPos, powerBlockFace)
++                )
++        )
+         ) {
+-            final BlockPos pistonHeadPos = targetPos.add(pistonHeadOffsetPos);
+-            if (world.isInBuildLimit(pistonHeadPos)
+-                    && BlockUtils.isReplaceable(world.getBlockState(pistonHeadPos))
+-                    && world.canPlace(stoneState, pistonHeadPos, ShapeContext.absent())
+-                    && BlockFinder.isPistonPlaceSafe(world, pistonPos, pistonFace)
+-            ) {
+-                final BlockPos powerBlockPos = targetPos.add(powerBlockOffsetPos);
+-                if (world.isInBuildLimit(powerBlockPos)
+-                        && BlockUtils.isReplaceable(world.getBlockState(powerBlockPos))
+-                ) {
+-                    final BlockPos dependBlockPos = targetPos.add(dependBlockOffsetPos);
+-                    final BlockState dependBlockState;
+-                    final BlockPos strongPoweringBlockByPowerBlockPos = targetPos.add(strongPoweringBlockByPowerBlockOffsetPos);
+-                    final BlockState strongPoweringBlockByPowerBlockState = world.getBlockState(strongPoweringBlockByPowerBlockPos);
+-                    if (world.isInBuildLimit(dependBlockPos)
+-                            && (
+-                            (
+-                                    BlockUtils.isReplaceable(dependBlockState = world.getBlockState(dependBlockPos))
+-                                            && world.canPlace(stoneState, dependBlockPos, ShapeContext.absent())
+-                                            && hasDependBlock
+-                            )
+-                                    || (
+-                                    (
+-                                            !useSolidBlockBetweenPowerBlockAndPiston
+-                                                    || strongPoweringBlockByPowerBlockState.isSolidBlock(world, strongPoweringBlockByPowerBlockPos)
+-                                    )
+-                                            && dependBlockState.isSideSolidFullSquare(world, dependBlockPos, powerBlockFace)
+-                            )
+-                    )
+-                    ) {
+-                        // 判断活塞和活塞头周边是否有朝向此活塞的活塞
+-                        for (Direction directionsAroundPiston : BlockFinder.DIRECTIONS) {
+-                            final BlockPos mayBeOtherPistonPos = pistonPos.offset(directionsAroundPiston);
+-                            if (world.getBlockState(mayBeOtherPistonPos).getBlock() instanceof PistonBlock) {
+-                                if (world.getBlockState(mayBeOtherPistonPos).get(Properties.FACING) == directionsAroundPiston.getOpposite()) {
+-                                    return false;
++            // 判断活塞和活塞头周边是否有朝向此活塞的活塞
++            {
++                final BlockPos pistonPos = ctx.pistonPos(this);
++                final BlockPos pistonHeadPos = ctx.pistonHeadPos(this);
++                for (Direction directionsAroundPiston : Directions.DIRECTIONS) {
++                    final BlockPos mayBeOtherPistonPos = pistonPos.offset(directionsAroundPiston);
++                    final BlockState mayBeOtherPistonState = ctx.state(mayBeOtherPistonPos);
++                    if (mayBeOtherPistonState.getBlock() instanceof PistonBlock
++                            && mayBeOtherPistonState.get(Properties.FACING) == directionsAroundPiston.getOpposite()) {
++                        return false;
++                    }
++                }
++                for (Direction directionsAroundPistonHead : Directions.DIRECTIONS) {
++                    final BlockPos mayBeOtherPistonPos = pistonHeadPos.offset(directionsAroundPistonHead);
++                    final BlockState mayBeOtherPistonState = ctx.state(mayBeOtherPistonPos);
++                    if (mayBeOtherPistonState.getBlock() instanceof PistonBlock
++                            && mayBeOtherPistonState.get(Properties.FACING) == directionsAroundPistonHead.getOpposite()) {
++                        return false;
++                    }
++                }
++            }
++            // 判断是否有其他能源方块正在激活附着方块
++            if (ctx.strongRedstonePowerAt(dependBlockSlot, dependBlockPos) == 0) {
++                // 判断能源方块强充能的位置是否有固体方块，如果有，判断能源方块是否能通过此方块充能到其他红石火把和活塞
++                {
++                    if (strongPoweringBlockByPowerBlockState.isSolidBlock(world, strongPoweringBlockByPowerBlockPos)) {
++                        for (Direction directionsAroundStrongPoweringBlockByPowerBlock : Directions.DIRECTIONS) {
++                            BlockPos mayGetPoweredPos = strongPoweringBlockByPowerBlockPos.offset(directionsAroundStrongPoweringBlockByPowerBlock);
++                            BlockState mayGetPoweredState = ctx.state(mayGetPoweredPos);
++                            Block mayGetPoweredBlock = mayGetPoweredState.getBlock();
++                            if (mayGetPoweredBlock instanceof RedstoneTorchBlock) {
++                                Direction redstoneTorchFace;
++                                if (mayGetPoweredBlock instanceof WallRedstoneTorchBlock) {
++                                    redstoneTorchFace = mayGetPoweredState.get(WallRedstoneTorchBlock.FACING);
++                                } else {
++                                    redstoneTorchFace = Direction.UP;
+                                 }
+-                            }
+-                        }
+-                        for (Direction directionsAroundPistonHead : BlockFinder.DIRECTIONS) {
+-                            final BlockPos mayBeOtherPistonPos = pistonHeadPos.offset(directionsAroundPistonHead);
+-                            if (world.getBlockState(mayBeOtherPistonPos).getBlock() instanceof PistonBlock) {
+-                                if (world.getBlockState(mayBeOtherPistonPos).get(Properties.FACING) == directionsAroundPistonHead.getOpposite()) {
++                                if (redstoneTorchFace == directionsAroundStrongPoweringBlockByPowerBlock)
+                                     return false;
+-                                }
+-                            }
+-                        }
+-                        // 判断是否有其他能源方块正在激活附着方块
+-                        if (world.getReceivedStrongRedstonePower(dependBlockPos) == 0) {
+-                            // 判断能源方块强充能的位置是否有固体方块，如果有，判断能源方块是否能通过此方块充能到其他红石火把和活塞
+-                            {
+-                                if (strongPoweringBlockByPowerBlockState.isSolidBlock(world, strongPoweringBlockByPowerBlockPos)) {
+-                                    for (Direction directionsAroundStrongPoweringBlockByPowerBlock : BlockFinder.DIRECTIONS) {
+-                                        BlockPos mayGetPoweredPos = strongPoweringBlockByPowerBlockPos.offset(directionsAroundStrongPoweringBlockByPowerBlock);
+-                                        BlockState mayGetPoweredState = world.getBlockState(mayGetPoweredPos);
+-                                        Block mayGetPoweredBlock = mayGetPoweredState.getBlock();
+-                                        if (mayGetPoweredBlock instanceof RedstoneTorchBlock) {
+-                                            Direction redstoneTorchFace;
+-                                            if (mayGetPoweredBlock instanceof WallRedstoneTorchBlock) {
+-                                                redstoneTorchFace = mayGetPoweredState.get(WallRedstoneTorchBlock.FACING);
+-                                            } else {
+-                                                redstoneTorchFace = Direction.UP;
+-                                            }
+-                                            if (redstoneTorchFace == directionsAroundStrongPoweringBlockByPowerBlock)
+-                                                return false;
+-                                        } else if (mayGetPoweredBlock instanceof PistonBlock) {
+-                                            return false;
+-                                        }
+-                                        mayGetPoweredBlock = world.getBlockState(mayGetPoweredPos.down()).getBlock();
+-                                        if (mayGetPoweredBlock instanceof PistonBlock) {
+-                                            return false;
+-                                        }
+-                                    }
+-                                }
++                            } else if (mayGetPoweredBlock instanceof PistonBlock) {
++                                return false;
+                             }
+-                            // 判断能源方块是否能不依赖强充能的方块激活其他活塞
+-                            {
+-                                for (Direction directionsAroundPowerBlock : BlockFinder.DIRECTIONS) {
+-                                    if (powerBlockType.isRedstoneTorch() && directionsAroundPowerBlock == powerBlockFace.getOpposite())
+-                                        continue;
+-                                    BlockPos mayGetPoweredPos = powerBlockPos.offset(directionsAroundPowerBlock);
+-                                    if (world.getBlockState(mayGetPoweredPos).getBlock() instanceof PistonBlock
+-                                            || world.getBlockState(mayGetPoweredPos.down()).getBlock() instanceof PistonBlock
+-                                    )
+-                                        return false;
+-                                }
++                            mayGetPoweredBlock = ctx.state(mayGetPoweredPos.down()).getBlock();
++                            if (mayGetPoweredBlock instanceof PistonBlock) {
++                                return false;
+                             }
+-                            return true;
+                         }
+                     }
+                 }
++                // 判断能源方块是否能不依赖强充能的方块激活其他活塞
++                {
++                    for (Direction directionsAroundPowerBlock : Directions.DIRECTIONS) {
++                        if (powerBlockType.isRedstoneTorch() && directionsAroundPowerBlock == powerBlockFace.getOpposite())
++                            continue;
++                        BlockPos mayGetPoweredPos = powerBlockPos.offset(directionsAroundPowerBlock);
++                        if (ctx.state(mayGetPoweredPos).getBlock() instanceof PistonBlock
++                                || ctx.state(mayGetPoweredPos.down()).getBlock() instanceof PistonBlock
++                        )
++                            return false;
++                    }
++                }
++                return true;
+             }
+         }
+         return false;
+diff --git a/src/main/java/me/z7087/blockminer/util/data/StructureSearchContext.java b/src/main/java/me/z7087/blockminer/util/data/StructureSearchContext.java
+new file mode 100644
+index 0000000..50e79df
+--- /dev/null
++++ b/src/main/java/me/z7087/blockminer/util/data/StructureSearchContext.java
+@@ -0,0 +1,362 @@
++package me.z7087.blockminer.util.data;
++
++import me.z7087.blockminer.util.BlockUtils;
++import me.z7087.blockminer.util.finder.BlockFinder;
++import net.minecraft.block.BlockState;
++import net.minecraft.block.Blocks;
++import net.minecraft.block.ShapeContext;
++import net.minecraft.util.math.BlockPos;
++import net.minecraft.util.math.Direction;
++import net.minecraft.world.World;
++import org.jetbrains.annotations.NotNull;
++import me.z7087.blockminer.util.BitSetUtils;
++
++/**
++ * 一次"结构搜索"的世界查询缓存。
++ *
++ * <p>背景：{@code Task.start()} 每 tick 都会调一次 {@code SearchMode.findPossibleStructures}，
++ * 返回的 Stream 会按偏好顺序逐个候选调用 {@link BlockBreakStructure#testBeforePlace}，
++ * 直到第一个通过全部检查的候选出现为止。当目标方块当前无解（地形不对、玩家还没到位）时，
++ * Stream 会被完整消费，也就是 <b>2430 个候选结构各做一遍完整的 testBeforePlace</b>。
++ *
++ * <p>而 testBeforePlace 里的世界查询高度重复：
++ * <ul>
++ *   <li>「活塞位置 + 活塞朝向」的合法性（含 2 次 {@code World#canPlace} 与
++ *       {@link BlockFinder#isPistonPlaceSafe} 里的 11 次 {@code isEmittingRedstonePower}）
++ *       只由 (pistonOffset, pistonFace) 决定，而全部 2430 个结构只对应 <b>30 种</b>组合；</li>
++ *   <li>{@code powerBlockPos} 的可放置性只由位置决定，2430 个结构只对应 62 个不同位置；</li>
++ *   <li>{@code getBlockState} / {@code canPlace} / {@code getReceivedStrongRedstonePower}
++ *       都是"位置 → 结果"的纯函数，在一次搜索内世界不会被修改。</li>
++ * </ul>
++ *
++ * <p>缓存的生命周期严格等于一次搜索（由 {@code findPossibleFullStructuresInCache} 创建、
++ * 随 Stream 一起被丢弃），期间不会有方块变更，因此缓存命中与真实查询结果必然相同。
++ *
++ * <h2>寻址：偏移盒子 + 每缓存稠密下标</h2>
++ *
++ * <p>这个上下文换掉的是"世界查询"，加上的是"查找"。省下的是贵的
++ * （{@code canPlace} 会扫实体碰撞、{@code isEmittingRedstonePower} 会算红石强度），
++ * 加上的是便宜的 —— 但一次搜索要对 2430 个候选各做约 8 次查找，所以查找本身必须接近免费。
++ *
++ * <p>第一层是<b>偏移盒子</b>：{@code testBeforePlace} 访问的每个位置都是
++ * {@code targetPos + offset}，而 offset 的三个分量都很小 —— 从结构集合里枚举出来是
++ * dx∈[-4,4]、dy∈[-5,5]、dz∈[-4,4]，于是
++ * {@code (dx,dy,dz) -> ((dx+4)*11 + (dy+5))*9 + (dz+4)} 是一个纯算术的双射，把查找变成一次数组访问。
++ *
++ * <p>第二层是<b>稠密下标</b>：盒子有 891 个槽，但每个缓存实际只会被问到其中一小部分
++ * （从 {@code BlockFinder.AllStructures} 推导），
++ * 于是六个缓存各自再经一张 {@code byte[891]} 表映射到 {@code 0..n-1}。
++ * 每张表 891 字节、<b>在整个进程里只分配一次</b>，而每个上下文省下的是
++ * <b>11,679 → 1,444 字节</b>的分配（每次搜索都要新建一个上下文，
++ * 于是那 10 KB 的归零与 GC 扫描是每次搜索都要付的）。
++ *
++ * <p>落在这张表之外的 offset（理论上不会出现）不缓存，直接问世界 —— 只是慢一点，语义不变。
++ *
++ * <p>注意：这是"少问世界几次"，不是"少搜几次" —— 搜索本身仍然是每 tick 全量做的。
++ */
++public final class StructureSearchContext {
++    // 静态枚举出的 offset 范围（见类注释）。超出就退回"不缓存"。
++    private static final int RANGE_X = 4;
++    private static final int RANGE_Y = 5;
++    private static final int RANGE_Z = 4;
++    private static final int DIM_X = 2 * RANGE_X + 1;
++    private static final int DIM_Y = 2 * RANGE_Y + 1;
++    private static final int DIM_Z = 2 * RANGE_Z + 1;
++    private static final int SLOTS = DIM_X * DIM_Y * DIM_Z;
++    /** 超出盒子时的返回值，表示"不缓存，直接问世界"。 */
++    private static final int OUT_OF_BOX = -1;
++
++    private static final byte UNKNOWN = 0;
++    private static final byte YES = 1;
++    private static final byte NO = 2;
++
++    private static final int DIRECTION_COUNT = Direction.values().length;
++    private static final int PISTON_KEY_COUNT = DIRECTION_COUNT * DIRECTION_COUNT;
++
++    private static final BlockState STONE = Blocks.STONE.getDefaultState();
++
++    private final @NotNull World world;
++    private final @NotNull BlockPos targetPos;
++    private final boolean hasDependBlock;
++
++    /** 下列六个数组都按偏移盒子下标索引。 */
++    private final BlockState[] stateCache;
++    private final byte[] canPlaceCache;
++    private final byte[] powerBlockPosCache;
++    private final byte[] strongPowerCache;
++    private final short[] emittingCache;
++
++    /**
++     * 整个偏移盒子是否都在可建范围内。世界可建区域是一个长方体
++     * （{@code isOutOfHeightLimit} 只看 Y，{@code isValidHorizontally} 是 ±30000000 的方框），
++     * 所以"包围盒的两个对角点都在范围内"就等价于"盒子里的每个位置都在范围内" ——
++     * 于是常见情况下一次搜索里近两千次判断可以塌缩成构造时的两次（见 {@link #isInBuildLimit}）。
++     */
++    private final boolean boxInBuildLimit;
++    /** offset -> isInBuildLimit 的结果（只在盒子没有整体落在范围内时才用得上） */
++    private final byte[] inBuildLimitCache = new byte[SLOTS];
++
++    /** key = pistonOffset.ordinal() * 6 + pistonFace.ordinal()，只有 30 种组合 */
++    private final byte[] pistonPlacementCache = new byte[PISTON_KEY_COUNT];
++    private final BlockPos[] pistonPosCache = new BlockPos[PISTON_KEY_COUNT];
++    private final BlockPos[] pistonHeadPosCache = new BlockPos[PISTON_KEY_COUNT];
++
++    public StructureSearchContext(@NotNull World world, @NotNull BlockPos targetPos, boolean hasDependBlock) {
++        this.world = world;
++        this.targetPos = targetPos;
++        this.hasDependBlock = hasDependBlock;
++
++        // 两个对角点都在可建范围内 ⟹ 整个盒子都在（可建区域是长方体）
++        this.boxInBuildLimit = world.isInBuildLimit(new BlockPos(
++                targetPos.getX() - RANGE_X, targetPos.getY() - RANGE_Y, targetPos.getZ() - RANGE_Z))
++                && world.isInBuildLimit(new BlockPos(
++                targetPos.getX() + RANGE_X, targetPos.getY() + RANGE_Y, targetPos.getZ() + RANGE_Z));
++        this.stateCache = new BlockState[SLOTS];
++        this.canPlaceCache = new byte[SLOTS];
++        this.powerBlockPosCache = new byte[SLOTS];
++        this.strongPowerCache = new byte[SLOTS];
++        this.emittingCache = new short[SLOTS];
++    }
++
++    public @NotNull World world() {
++        return world;
++    }
++
++    public @NotNull BlockPos targetPos() {
++        return targetPos;
++    }
++
++    public boolean hasDependBlock() {
++        return hasDependBlock;
++    }
++
++    /** 把相对 targetPos 的三个分量打成一个数组下标；超出盒子返回 {@link #OUT_OF_BOX}。 */
++    private static int pack(int x, int y, int z) {
++        if (x < -RANGE_X || x > RANGE_X || y < -RANGE_Y || y > RANGE_Y || z < -RANGE_Z || z > RANGE_Z)
++            return OUT_OF_BOX;
++        return ((x + RANGE_X) * DIM_Y + (y + RANGE_Y)) * DIM_Z + (z + RANGE_Z);
++    }
++
++    /**
++     * 偏移 -> 盒子下标。{@link #OUT_OF_BOX} 表示落在盒子外（只能退回世界查询）。
++     *
++     * <p>暴露出来是为了<b>同一个位置只算一次下标</b>：{@code testBeforePlace} 一次候选里会对同一个位置
++     * 查 3~4 个缓存（位置表 / 方块状态 / 可放置 / 强充能），每次都重算的话，
++     * JFR 实测下标计算（{@code pack} + {@code slotOfPos}）占单次搜索约 19%。
++     */
++    public static int slotOfOffset(@NotNull BlockPos offsetPos) {
++        return pack(offsetPos.getX(), offsetPos.getY(), offsetPos.getZ());
++    }
++
++    private int slotOfPos(@NotNull BlockPos pos) {
++        return pack(pos.getX() - targetPos.getX(), pos.getY() - targetPos.getY(), pos.getZ() - targetPos.getZ());
++    }
++
++    /**
++     * targetPos + offset。也走同一张位置表，所以同一个位置只会算一次 BlockPos。
++     */
++    public @NotNull BlockPos posAt(@NotNull BlockPos offsetPos) {
++        return posAt(slotOfOffset(offsetPos), offsetPos);
++    }
++
++    /** 已经算过下标时用这个，省掉一次下标计算。 */
++    public @NotNull BlockPos posAt(int slot, @NotNull BlockPos offsetPos) {
++        return targetPos.add(offsetPos);
++    }
++
++    public @NotNull BlockState state(@NotNull BlockPos pos) {
++        return stateAt(slotOfPos(pos), pos);
++    }
++
++    /** 已经算过下标时用这个。 */
++    public @NotNull BlockState stateAt(int slot, @NotNull BlockPos pos) {
++        if (slot == OUT_OF_BOX)
++            return world.getBlockState(pos);
++        final int i = slot;
++        final BlockState cached = stateCache[i];
++        if (cached != null)
++            return cached;
++        final BlockState state = world.getBlockState(pos);
++        stateCache[i] = state;
++        return state;
++    }
++
++    /** {@code world.canPlace(STONE, pos, ShapeContext.absent())}，这个调用内部会做实体碰撞扫描。 */
++    public boolean canPlaceStone(@NotNull BlockPos pos) {
++        return canPlaceStoneAt(slotOfPos(pos), pos);
++    }
++
++    /** 已经算过下标时用这个。 */
++    public boolean canPlaceStoneAt(int slot, @NotNull BlockPos pos) {
++        if (slot == OUT_OF_BOX)
++            return world.canPlace(STONE, pos, ShapeContext.absent());
++        final int i = slot;
++        final byte cached = canPlaceCache[i];
++        if (cached != UNKNOWN)
++            return cached == YES;
++        final boolean result = world.canPlace(STONE, pos, ShapeContext.absent());
++        canPlaceCache[i] = result ? YES : NO;
++        return result;
++    }
++
++    public int strongRedstonePower(@NotNull BlockPos pos) {
++        return strongRedstonePowerAt(slotOfPos(pos), pos);
++    }
++
++    /** 已经算过下标时用这个。 */
++    public int strongRedstonePowerAt(int slot, @NotNull BlockPos pos) {
++        if (slot == OUT_OF_BOX)
++            return world.getReceivedStrongRedstonePower(pos);
++        final int i = slot;
++        final byte cached = strongPowerCache[i];
++        if (cached != 0)
++            return cached - 1;
++        final int result = world.getReceivedStrongRedstonePower(pos);
++        strongPowerCache[i] = (byte) (result + 1);
++        return result;
++    }
++
++    public boolean isEmittingRedstonePower(@NotNull BlockPos pos, @NotNull Direction direction) {
++        final int slot = slotOfPos(pos);
++        if (slot == OUT_OF_BOX)
++            return world.isEmittingRedstonePower(pos, direction);
++        final int i = slot;
++        final int bit = 1 << direction.ordinal();
++        final short cached = emittingCache[i];
++        if ((cached & bit) != 0)
++            return (cached & (bit << 6)) != 0;
++        final boolean result = world.isEmittingRedstonePower(pos, direction);
++        emittingCache[i] = (short) (cached | bit | (result ? bit << 6 : 0));
++        return result;
++    }
++
++    /**
++     * {@code world.isInBuildLimit(pos)}。本身是纯边界判断（很便宜），但它<b>每个候选都会被问一次</b>：
++     * {@link BlockBreakStructure#testBeforePlace} 对每个候选都要判一次依赖方块的位置，
++     * 而依赖方块只由 (powerBlockOffset, powerBlockFace) 决定 —— 与 {@link #strongRedstonePower} 同一个位置集合。
++     * 一次 {@code SearchMode.All} 搜索实测调用 1905 次、不同位置只有 87 个，所以照样值得缓存。
++     */
++    public boolean isInBuildLimit(@NotNull BlockPos pos) {
++        return isInBuildLimitAt(slotOfPos(pos), pos);
++    }
++
++    /** 已经算过下标时用这个（{@code slot} 可以是 {@link #OUT_OF_BOX}）。 */
++    public boolean isInBuildLimitAt(int slot, @NotNull BlockPos pos) {
++        if (boxInBuildLimit)
++            return true;
++        if (slot == OUT_OF_BOX)
++            return world.isInBuildLimit(pos);
++        final byte cached = inBuildLimitCache[slot];
++        if (cached != UNKNOWN)
++            return cached == YES;
++        final boolean result = world.isInBuildLimit(pos);
++        inBuildLimitCache[slot] = result ? YES : NO;
++        return result;
++    }
++
++    public boolean isReplaceable(@NotNull BlockPos pos) {
++        return BlockUtils.isReplaceable(state(pos));
++    }
++
++    /**
++     * 活塞摆放子检查（原 {@link BlockBreakStructure#testBeforePlace} 的前半段）：
++     * 活塞本体可放、活塞头位置可放、且不会因为红石干扰而提前伸出。
++     * 只由 (pistonOffset, pistonFace) 决定 —— 这正是 81 倍重复的来源。
++     */
++    public boolean pistonPlacementOk(@NotNull BlockBreakStructure structure) {
++        final int key = structure.pistonPlacementKey;
++        final byte cached = pistonPlacementCache[key];
++        if (cached != UNKNOWN)
++            return cached == YES;
++        final BlockPos pistonPos = posAt(structure.pistonOffsetPos);
++        pistonPosCache[key] = pistonPos;
++        boolean ok = isInBuildLimit(pistonPos)
++                && isReplaceable(pistonPos)
++                && canPlaceStone(pistonPos);
++        if (ok) {
++            final BlockPos pistonHeadPos = posAt(structure.pistonHeadOffsetPos);
++            pistonHeadPosCache[key] = pistonHeadPos;
++            ok = isInBuildLimit(pistonHeadPos)
++                    && isReplaceable(pistonHeadPos)
++                    && canPlaceStone(pistonHeadPos)
++                    && BlockFinder.isPistonPlaceSafe(this, pistonPos, structure.pistonFace);
++        }
++        pistonPlacementCache[key] = ok ? YES : NO;
++        return ok;
++    }
++
++    /**
++     * 把 pistonPlacementOk == false 的结构从 {@code bits} 里清掉。
++     * 只调 30 次活塞检查（每种 pistonOffset+pistonFace 组合一次），然后对 NO 的组合
++     * AND NOT {@code mPiston[key]}——原来这些是在 advance 里逐候选跑 testBeforePlace 时 return false 的。
++     */
++    public void applyPistonMask(@NotNull long[] bits, long[][] mPiston) {
++        final Direction[] directions = Direction.values();
++        for (int key = 0; key < mPiston.length; ++key) {
++            if (mPiston[key] == null)
++                continue;
++            final byte cached = pistonPlacementCache[key];
++            if (cached == UNKNOWN) {
++                final Direction pistonOffset = directions[key / directions.length];
++                final Direction pistonFace = directions[key % directions.length];
++                final BlockPos pistonOffsetPos = BlockPos.ORIGIN.offset(pistonOffset);
++                final BlockPos pistonHeadOffsetPos = pistonOffsetPos.offset(pistonFace);
++                final BlockPos pistonPos = posAt(pistonOffsetPos);
++                pistonPosCache[key] = pistonPos;
++                boolean ok = isInBuildLimit(pistonPos)
++                        && isReplaceable(pistonPos)
++                        && canPlaceStone(pistonPos);
++                if (ok) {
++                    final BlockPos pistonHeadPos = posAt(pistonHeadOffsetPos);
++                    pistonHeadPosCache[key] = pistonHeadPos;
++                    ok = isInBuildLimit(pistonHeadPos)
++                            && isReplaceable(pistonHeadPos)
++                            && canPlaceStone(pistonHeadPos)
++                            && BlockFinder.isPistonPlaceSafe(this, pistonPos, pistonFace);
++                }
++                pistonPlacementCache[key] = ok ? YES : NO;
++            }
++            if (pistonPlacementCache[key] == NO) {
++                BitSetUtils.orIfPresent(bits, mPiston[key]);
++            }
++        }
++    }
++
++    public @NotNull BlockPos pistonPos(@NotNull BlockBreakStructure structure) {
++        final BlockPos cached = pistonPosCache[structure.pistonPlacementKey];
++        if (cached != null)
++            return cached;
++        return posAt(structure.pistonOffsetPos);
++    }
++
++    public @NotNull BlockPos pistonHeadPos(@NotNull BlockBreakStructure structure) {
++        final BlockPos cached = pistonHeadPosCache[structure.pistonPlacementKey];
++        if (cached != null)
++            return cached;
++        return posAt(structure.pistonHeadOffsetPos);
++    }
++
++    /**
++     * 能源方块位置可放性，只由位置决定。
++     *
++     * <p>这里必须单独缓存：{@code isReplaceable} 走 {@link #state} 的表很便宜，
++     * 但 {@code world.isInBuildLimit(...)} 是一次跨对象调用 —— 不缓存的话它会被每个候选重复调用，
++     * 实测会把每轮搜索的 isInBuildLimit 次数从 1.3k 抬到 2.5k。
++     */
++    public boolean powerBlockPosOk(@NotNull BlockPos powerBlockPos) {
++        return powerBlockPosOkAt(slotOfPos(powerBlockPos), powerBlockPos);
++    }
++
++    /** 已经算过下标时用这个。 */
++    public boolean powerBlockPosOkAt(int slot, @NotNull BlockPos powerBlockPos) {
++        if (slot == OUT_OF_BOX)
++            return world.isInBuildLimit(powerBlockPos) && isReplaceable(powerBlockPos);
++        final int i = slot;
++        final byte cached = powerBlockPosCache[i];
++        if (cached != UNKNOWN)
++            return cached == YES;
++        final boolean ok = isInBuildLimit(powerBlockPos) && isReplaceable(powerBlockPos);
++        powerBlockPosCache[i] = ok ? YES : NO;
++        return ok;
++    }
++}
+diff --git a/src/main/java/me/z7087/blockminer/util/finder/BlockFinder.java b/src/main/java/me/z7087/blockminer/util/finder/BlockFinder.java
+index f12c028..2b54d4d 100644
+--- a/src/main/java/me/z7087/blockminer/util/finder/BlockFinder.java
++++ b/src/main/java/me/z7087/blockminer/util/finder/BlockFinder.java
+@@ -1,7 +1,9 @@
+ package me.z7087.blockminer.util.finder;
+ 
++import me.z7087.blockminer.util.BitSetUtils;
+ import me.z7087.blockminer.util.BlockUtils;
+ import me.z7087.blockminer.util.constants.PositionsInSteps;
++import me.z7087.blockminer.util.constants.Directions;
+ import me.z7087.blockminer.util.data.*;
+ import me.z7087.blockminer.api.enums.PowerBlockType;
+ import net.minecraft.block.*;
+@@ -13,28 +15,15 @@ import org.jetbrains.annotations.NotNull;
+ import java.util.*;
+ import java.util.function.BiFunction;
+ import java.util.stream.Stream;
++import java.util.Iterator;
++import java.util.NoSuchElementException;
++import java.util.Spliterator;
++import java.util.Spliterators;
++import java.util.stream.StreamSupport;
+ 
+ public final class BlockFinder {
+     private BlockFinder() {}
+ 
+-    public static final Direction[] DIRECTIONS = Direction.values();
+-    public static final Direction[][] DIRECTIONS_WITHOUT;
+-    static {
+-        Direction[] DIRECTIONS = BlockFinder.DIRECTIONS;
+-        final int DirectionsCount = DIRECTIONS.length;
+-        DIRECTIONS_WITHOUT = new Direction[DirectionsCount][DirectionsCount - 1];
+-        for (int i = 0; i < DirectionsCount; ++i) {
+-            Direction direction = DIRECTIONS[i];
+-            for (int j = 0, k = 0; j < DirectionsCount; j++) {
+-                Direction anotherDirection = DIRECTIONS[j];
+-                if (anotherDirection != direction) {
+-                    DIRECTIONS_WITHOUT[i][k++] = anotherDirection;
+-                }
+-            }
+-        }
+-    }
+-    private static final Direction[] DIRECTIONS_WITHOUT_UP = DIRECTIONS_WITHOUT[Direction.UP.ordinal()];
+-    private static final Direction[] DIRECTIONS_WITHOUT_DOWN = DIRECTIONS_WITHOUT[Direction.DOWN.ordinal()];
+ 
+     public static final Comparator<BlockBreakStructure> STRUCTURE_SORT_COMPARATOR = (a, b) -> {
+         // 对true=better的条件交换排序
+@@ -108,9 +97,9 @@ public final class BlockFinder {
+                         return oldStructure;
+                     return newStructure;
+                 };
+-        for (Direction pistonOffset : DIRECTIONS) {
++        for (Direction pistonOffset : Directions.DIRECTIONS) {
+             final BlockPos pistonOffsetPos = BlockPos.ORIGIN.offset(pistonOffset);
+-            for (Direction pistonFace : DIRECTIONS) {
++            for (Direction pistonFace : Directions.DIRECTIONS) {
+                 if (pistonFace.getOpposite() != pistonOffset) {
+                     final ArrayList<BlockBreakStructure> tmpRedstoneTorchPossibleStructures = new ArrayList<>();
+                     final ArrayList<BlockBreakStructure> tmpLeverPossibleStructures = new ArrayList<>();
+@@ -176,14 +165,14 @@ public final class BlockFinder {
+         final BlockPos targetOffsetPos = BlockPos.ORIGIN; // always 000
+         final BlockPos pistonHeadOffsetPos = pistonOffsetPos.offset(pistonFace);
+         final BlockPos pistonUpOffsetPos = pistonOffsetPos.up();
+-        for (Direction direction : DIRECTIONS) {
++        for (Direction direction : Directions.DIRECTIONS) {
+             {
+                 final BlockPos redstoneTorchOffsetPos = poweredOffsetPos.offset(direction);
+                 if (!targetOffsetPos.equals(redstoneTorchOffsetPos)
+                         && !pistonOffsetPos.equals(redstoneTorchOffsetPos)
+                         && !pistonHeadOffsetPos.equals(redstoneTorchOffsetPos)
+                 ) {
+-                    for (Direction dependDirection : DIRECTIONS_WITHOUT_UP) {
++                    for (Direction dependDirection : Directions.DIRECTIONS_WITHOUT_UP) {
+                         final BlockPos dependBlockOffsetPos = redstoneTorchOffsetPos.offset(dependDirection);
+                         if (!pistonOffsetPos.equals(dependBlockOffsetPos)
+                                 && !pistonHeadOffsetPos.equals(dependBlockOffsetPos)
+@@ -213,7 +202,7 @@ public final class BlockFinder {
+                             && !pistonOffsetPos.equals(redstoneTorchOffsetPos)
+                             && !pistonHeadOffsetPos.equals(redstoneTorchOffsetPos)
+                     ) {
+-                        for (Direction dependDirection : DIRECTIONS_WITHOUT_UP) {
++                        for (Direction dependDirection : Directions.DIRECTIONS_WITHOUT_UP) {
+                             final BlockPos dependBlockOffsetPos = redstoneTorchOffsetPos.offset(dependDirection);
+                             if (!pistonOffsetPos.equals(dependBlockOffsetPos)
+                                     && !pistonHeadOffsetPos.equals(dependBlockOffsetPos)
+@@ -244,14 +233,14 @@ public final class BlockFinder {
+     ) {
+         final BlockPos targetOffsetPos = BlockPos.ORIGIN;
+         final BlockPos pistonHeadOffsetPos = pistonOffsetPos.offset(pistonFace);
+-        for (Direction direction : DIRECTIONS) {
++        for (Direction direction : Directions.DIRECTIONS) {
+             {
+                 final BlockPos leverOffsetPos = poweredOffsetPos.offset(direction);
+                 if (!targetOffsetPos.equals(leverOffsetPos)
+                         && !pistonOffsetPos.equals(leverOffsetPos)
+                         && !pistonHeadOffsetPos.equals(leverOffsetPos)
+                 ) {
+-                    for (Direction dependDirection : DIRECTIONS) {
++                    for (Direction dependDirection : Directions.DIRECTIONS) {
+                         final BlockPos dependBlockOffsetPos = leverOffsetPos.offset(dependDirection);
+                         if (!pistonOffsetPos.equals(dependBlockOffsetPos)
+                                 && !pistonHeadOffsetPos.equals(dependBlockOffsetPos)
+@@ -279,7 +268,7 @@ public final class BlockFinder {
+                 if (!pistonOffsetPos.equals(dependBlockBetweenLeverAndPistonOffsetPos)
+                         && !pistonHeadOffsetPos.equals(dependBlockBetweenLeverAndPistonOffsetPos)
+                 ) {
+-                    for (Direction leverFace : DIRECTIONS) {
++                    for (Direction leverFace : Directions.DIRECTIONS) {
+                         final BlockPos leverOffsetPos = dependBlockBetweenLeverAndPistonOffsetPos.offset(leverFace);
+                         if (!targetOffsetPos.equals(leverOffsetPos)
+                                 && !pistonOffsetPos.equals(leverOffsetPos)
+@@ -307,17 +296,34 @@ public final class BlockFinder {
+     }
+ 
+     public static boolean isPistonPlaceSafe(World world, BlockPos pistonPos, Direction face) {
+-        for (Direction direction : DIRECTIONS_WITHOUT[face.ordinal()]) {
+-            if (world.isEmittingRedstonePower(pistonPos.offset(direction), direction)) {
++        return isPistonPlaceSafe(world::isEmittingRedstonePower, pistonPos, face);
++    }
++
++    /**
++     * 优化点 S-3：与上面等价，但红石发射查询走 {@link StructureSearchContext} 的 (位置, 方向) 缓存。
++     * 控制流逐行不变。
++     */
++    public static boolean isPistonPlaceSafe(StructureSearchContext ctx, BlockPos pistonPos, Direction face) {
++        return isPistonPlaceSafe(ctx::isEmittingRedstonePower, pistonPos, face);
++    }
++
++    @FunctionalInterface
++    private interface RedstonePowerQuery {
++        boolean isEmitting(BlockPos pos, Direction direction);
++    }
++
++    private static boolean isPistonPlaceSafe(RedstonePowerQuery query, BlockPos pistonPos, Direction face) {
++        for (Direction direction : Directions.DIRECTIONS_WITHOUT[face.ordinal()]) {
++            if (query.isEmitting(pistonPos.offset(direction), direction)) {
+                 return false;
+             }
+         }
+-        if (world.isEmittingRedstonePower(pistonPos, Direction.DOWN)) {
++        if (query.isEmitting(pistonPos, Direction.DOWN)) {
+             return false;
+         }
+         final BlockPos pistonQCPos = pistonPos.up();
+-        for (Direction direction : DIRECTIONS_WITHOUT_DOWN) {
+-            if (world.isEmittingRedstonePower(pistonQCPos.offset(direction), direction)) {
++        for (Direction direction : Directions.DIRECTIONS_WITHOUT_DOWN) {
++            if (query.isEmitting(pistonQCPos.offset(direction), direction)) {
+                 return false;
+             }
+         }
+@@ -356,92 +362,228 @@ public final class BlockFinder {
+ 
+     public static final class StructureFilterCache {
+         private static final UniqueObjectCollection<BlockBreakStructure> STRUCTURES = UniqueObjectCollection.createInstance("StructureFilterCache.BlockBreakStructure", BlockBreakStructure[]::new, AllStructures);
+-        private static final UniqueObject<BlockPos>[] UNIQUE_POSITIONS = UniqueObjectPool.createUniqueObjectArray(UniqueObjectPool.withSInt32Limit("StructureFilterCache.BlockPos"), PositionsInSteps.S4.posList);
++        /** 位置表交给 UniqueObjectCollection：它同时存了原始数组（getOriginalObjects()）和带 id 的包装数组，
++         *  并沿用命名池的 int32 上界检查。各处把原始数组取到局部变量 `positions` 用，一次数组访问即可
++         *  （实测 129 个元素：裸数组 410 ns，比原来的 UniqueObject 包装 540 ns 快 130 ns）。 */
++        private static final UniqueObjectCollection<BlockPos> POSITIONS = UniqueObjectCollection.createInstance(
++                "StructureFilterCache.BlockPos", BlockPos[]::new, PositionsInSteps.S4.posList);
+         // 这里用0来表示可用，1表示不可用，因为新建BitSet默认填充0
+         // 因为BlockPos也有一个从0开始的连续递增编号，似乎不需要哈希表了
+-        static final BitSet[] M_OUT_OF_WORLD;
+-        static final BitSet[] M_PLACEABLE;
+-        static final BitSet[] M_SOLID_BLOCK;
+-        static final BitSet[] M_OTHER;
++        static final long[][] M_OUT_OF_WORLD;
++        static final long[][] M_PLACEABLE;
++        static final long[][] M_SOLID_BLOCK;
++        static final long[][] M_OTHER;
++        static final long[][] M_PISTON;
++        static final long[][] M_POWER_TYPE_NOT;
+         static {
+             //long time = System.nanoTime();
+             //System.out.println("starting init StructureFilterCache");
+-            final BitSet initnalSearchBitSet = new BitSet(STRUCTURES.size());
+-            initnalSearchBitSet.set(0, STRUCTURES.size(), true);
+-
+-            final BitSet[] mOOW = new BitSet[UNIQUE_POSITIONS.length];
+-            final BitSet[] mPlaceable = mOOW.clone();
+-            final BitSet[] mSolidBlock = mOOW.clone();
+-            final BitSet[] mOther = mOOW.clone();
+-            for (UniqueObject<BlockPos> uniquePos : UNIQUE_POSITIONS) {
+-                final BlockPos pos = uniquePos.get();
+-                final BitSet sOOW = (BitSet) initnalSearchBitSet.clone();
+-                final BitSet sPlaceable = (BitSet) initnalSearchBitSet.clone();
+-                final BitSet sSolidBlock = (BitSet) initnalSearchBitSet.clone();
+-                final BitSet sOther = (BitSet) initnalSearchBitSet.clone();
++            final BlockPos[] positions = POSITIONS.getOriginalObjects();
++            final long[] initnalSearchBitSet = BitSetUtils.allOnes(STRUCTURES.size());
++
++            final long[][] mOOW = new long[positions.length][];
++            final long[][] mPlaceable = new long[positions.length][];
++            final long[][] mSolidBlock = new long[positions.length][];
++            final long[][] mOther = new long[positions.length][];
++            for (int uniquePosId = 0; uniquePosId < positions.length; ++uniquePosId) {
++                final BlockPos pos = positions[uniquePosId];
++                final long[] sOOW = initnalSearchBitSet.clone();
++                final long[] sPlaceable = initnalSearchBitSet.clone();
++                final long[] sSolidBlock = initnalSearchBitSet.clone();
++                final long[] sOther = initnalSearchBitSet.clone();
+                 for (UniqueObject<BlockBreakStructure> uniqueStructure : STRUCTURES.getUniqueObjects()) {
+                     final BlockBreakStructure structure = uniqueStructure.get();
+                     final int uniqueStructureId = (int) uniqueStructure.id();
+                     if (structure.testForPosFilter(ComparablePredicate.CP_OUT_OF_WORLD, pos)) {
+-                        sOOW.set(uniqueStructureId, false);
++                        BitSetUtils.clearBit(sOOW, uniqueStructureId);
+                     }
+                     if (structure.testForPosFilter(ComparablePredicate.CP_PLACEABLE, pos)) {
+-                        sPlaceable.set(uniqueStructureId, false);
++                        BitSetUtils.clearBit(sPlaceable, uniqueStructureId);
+                     }
+                     if (structure.testForPosFilter(ComparablePredicate.CP_SOLID_BLOCK, pos)) {
+-                        sSolidBlock.set(uniqueStructureId, false);
++                        BitSetUtils.clearBit(sSolidBlock, uniqueStructureId);
+                     }
+                     if (structure.testForPosFilter(ComparablePredicate.CP_OTHER, pos)) {
+-                        sOther.set(uniqueStructureId, false);
++                        BitSetUtils.clearBit(sOther, uniqueStructureId);
+                     }
+                 }
+-                final int uniquePosId = (int) uniquePos.id();
+-                mOOW[uniquePosId] = sOOW;
+-                mPlaceable[uniquePosId] = sPlaceable;
+-                mSolidBlock[uniquePosId] = sSolidBlock;
+-                mOther[uniquePosId] = sOther;
++                // 整份全零的掩码存 null，查表时一次判空就能跳过：129 个里 PLACEABLE 有 111 个、
++                // SOLID_BLOCK 67 个、OTHER 42 个、OUT_OF_WORLD 6 个（"全零"的判定条件已逐位核对过，
++                // 见 NEXT-OPTIMIZATIONS.md）。
++                mOOW[uniquePosId] = BitSetUtils.isEmpty(sOOW) ? null : sOOW;
++                mPlaceable[uniquePosId] = BitSetUtils.isEmpty(sPlaceable) ? null : sPlaceable;
++                mSolidBlock[uniquePosId] = BitSetUtils.isEmpty(sSolidBlock) ? null : sSolidBlock;
++                mOther[uniquePosId] = BitSetUtils.isEmpty(sOther) ? null : sOther;
+             }
+             M_OUT_OF_WORLD = mOOW;
+             M_PLACEABLE = mPlaceable;
+             M_SOLID_BLOCK = mSolidBlock;
+             M_OTHER = mOther;
++
++            final int dc = Direction.values().length;
++            final int pkc = dc * dc;
++            final long[][] mPiston = new long[pkc][];
++            for (int key = 0; key < pkc; ++key) {
++                final long[] bits = new long[BitSetUtils.wordCount(STRUCTURES.size())];
++                boolean any = false;
++                for (UniqueObject<BlockBreakStructure> us : STRUCTURES.getUniqueObjects()) {
++                    if (us.get().pistonPlacementKey == key) {
++                        BitSetUtils.setBit(bits, (int) us.id());
++                        any = true;
++                    }
++                }
++                mPiston[key] = any ? bits : null;
++            }
++            M_PISTON = mPiston;
++
++            final long[][] mPowerTypeNot = new long[PowerBlockType.values().length][];
++            for (PowerBlockType type : PowerBlockType.values()) {
++                if (type == PowerBlockType.Both) { mPowerTypeNot[type.ordinal()] = null; continue; }
++                final long[] bits = new long[BitSetUtils.wordCount(STRUCTURES.size())];
++                boolean any = false;
++                for (UniqueObject<BlockBreakStructure> us : STRUCTURES.getUniqueObjects()) {
++                    if (us.get().powerBlockType != type) {
++                        BitSetUtils.setBit(bits, (int) us.id());
++                        any = true;
++                    }
++                }
++                mPowerTypeNot[type.ordinal()] = any ? bits : null;
++            }
++            M_POWER_TYPE_NOT = mPowerTypeNot;
+             //time = System.nanoTime() - time;
+             //System.out.println("end init StructureFilterCache with " + time / 1000000.D + " milliseconds");
+         }
+ 
+         // 需要使用testBeforePlace二次测试
+         public static @NotNull Stream<BlockBreakStructure> findPossibleStructuresInCache(@NotNull World world, @NotNull BlockPos targetPos) {
+-            final BitSet possibleStructures = new BitSet(STRUCTURES.size());
+-            for (int uniquePosId = 0; uniquePosId < UNIQUE_POSITIONS.length; ++uniquePosId) {
+-                final UniqueObject<BlockPos> uniqueOffsetPos = UNIQUE_POSITIONS[uniquePosId];
+-                final BlockPos pos = targetPos.add(uniqueOffsetPos.get());
+-                final BlockState state = world.getBlockState(pos);
+-                if (ComparablePredicate.CP_OUT_OF_WORLD.test(world, pos, state)) {
+-                    possibleStructures.or(M_OUT_OF_WORLD[uniquePosId]);
++            return findPossibleStructuresInCache(new StructureSearchContext(world, targetPos, false));
++        }
++
++        private static long[] possibleStructures(@NotNull StructureSearchContext ctx,
++                @NotNull PowerBlockType powerBlockUsage) {
++            final World world = ctx.world();
++            final long[] possibleStructures = new long[BitSetUtils.wordCount(STRUCTURES.size())];
++            final BlockPos[] positions = POSITIONS.getOriginalObjects();
++            // 掩码这趟每个位置只读一次状态、不长期持有位置，所以复用一个可变的 BlockPos：
++            // 实测这里原来每次搜索要 new 129 个 BlockPos（约 4 KB），而位置表缓存对它们几乎不命中。
++            final BlockPos.Mutable pos = new BlockPos.Mutable();
++            final BlockPos targetPos = ctx.targetPos();
++            for (int uniquePosId = 0, length = positions.length; uniquePosId < length; ++uniquePosId) {
++                final BlockPos offset = positions[uniquePosId];
++                pos.set(targetPos.getX() + offset.getX(),
++                        targetPos.getY() + offset.getY(),
++                        targetPos.getZ() + offset.getZ());
++                final BlockState state = ctx.state(pos);
++                // 走 ctx 的整盒捷径（可建区域是长方体，整个盒子在范围内时直接返回 true，不再问世界）
++                if (!ctx.isInBuildLimit(pos)) {
++                    BitSetUtils.orIfPresent(possibleStructures, M_OUT_OF_WORLD[uniquePosId]);
+                 } else if (ComparablePredicate.CP_PLACEABLE.test(world, pos, state)) {
+-                    possibleStructures.or(M_PLACEABLE[uniquePosId]);
++                    BitSetUtils.orIfPresent(possibleStructures, M_PLACEABLE[uniquePosId]);
+                 } else if (ComparablePredicate.CP_SOLID_BLOCK.test(world, pos, state)) {
+-                    possibleStructures.or(M_SOLID_BLOCK[uniquePosId]);
++                    BitSetUtils.orIfPresent(possibleStructures, M_SOLID_BLOCK[uniquePosId]);
+                 } else {
+-                    possibleStructures.or(M_OTHER[uniquePosId]);
++                    BitSetUtils.orIfPresent(possibleStructures, M_OTHER[uniquePosId]);
+                 }
+             }
+-            possibleStructures.flip(0, STRUCTURES.size()); // TODO
+-            return possibleStructures.stream().mapToObj((id) -> STRUCTURES.getOriginalObjects()[id]);
++            BitSetUtils.orIfPresent(possibleStructures, M_POWER_TYPE_NOT[powerBlockUsage.ordinal()]);
++            return possibleStructures;
+         }
+ 
++        public static @NotNull Stream<BlockBreakStructure> findPossibleStructuresInCache(@NotNull StructureSearchContext ctx) {
++            return BitSetUtils.streamSetBits(possibleStructures(ctx, PowerBlockType.Both), STRUCTURES.getOriginalObjects());
++        }
++
++        /**
++         * 优化点 S-4：返回 {@link BlockBreakStructure}（而不是已经算好 5 个 BlockPos 的
++         * {@link BlockBreakStructureFull}）。调用方用 {@link StructureSearchContext#posAt(BlockPos)}
++         * 取位置即可，只有真正选中的那个候选才需要构造 Full。
++         * 这样在"当前无解"的世界里可以省掉每次搜索几百到 2430 次对象分配。
++         */
++        public static @NotNull Stream<BlockBreakStructure> findPossibleStructuresInCache(
++                @NotNull StructureSearchContext ctx,
++                @NotNull PowerBlockType powerBlockUsage,
++                boolean hasDependBlock
++        ) {
++            return StreamSupport.stream(
++                    Spliterators.spliteratorUnknownSize(findPossibleStructuresIterator(ctx, powerBlockUsage, hasDependBlock),
++                            Spliterator.ORDERED | Spliterator.NONNULL),
++                    false);
++        }
++
++        /**
++         * 热路径：直接给迭代器。原来这里是一条 {@code Stream}，两层 {@code .filter()} 的
++         * {@code ReferencePipeline} 机制实测占了单次搜索 ~18%（JFR：{@code ReferencePipeline$2$1.accept}
++         * + {@code WrappingSpliterator.fillBuffer} + {@code IteratorSpliterator.tryAdvance} +
++         * {@code Sink.cancellationRequested}）。换成一个小迭代器之后这些全没了。
++         */
++        public static @NotNull Iterator<BlockBreakStructure> findPossibleStructuresIterator(
++                @NotNull StructureSearchContext ctx,
++                @NotNull PowerBlockType powerBlockUsage,
++                boolean hasDependBlock
++        ) {
++            final long[] bits = possibleStructures(ctx, powerBlockUsage);
++            ctx.applyPistonMask(bits, M_PISTON);
++            return new FilteredIterator(
++                    BitSetUtils.unsetBitIterator(bits, STRUCTURES.getOriginalObjects(), STRUCTURES.size()),
++                    powerBlockUsage, ctx);
++        }
++
++        private static final class FilteredIterator implements Iterator<BlockBreakStructure> {
++            private final Iterator<BlockBreakStructure> delegate;
++            private final PowerBlockType powerBlockUsage;
++            private final StructureSearchContext ctx;
++            private BlockBreakStructure next;
++
++            FilteredIterator(@NotNull Iterator<BlockBreakStructure> delegate,
++                             @NotNull PowerBlockType powerBlockUsage,
++                             @NotNull StructureSearchContext ctx) {
++                this.delegate = delegate;
++                this.powerBlockUsage = powerBlockUsage;
++                this.ctx = ctx;
++                advance();
++            }
++
++            private void advance() {
++                while (delegate.hasNext()) {
++                    final BlockBreakStructure candidate = delegate.next();
++                    if (!candidate.testBeforePlace(ctx))
++                        continue;
++                    next = candidate;
++                    return;
++                }
++                next = null;
++            }
++
++            @Override
++            public boolean hasNext() {
++                return next != null;
++            }
++
++            @Override
++            public BlockBreakStructure next() {
++                if (next == null)
++                    throw new NoSuchElementException();
++                final BlockBreakStructure value = next;
++                advance();
++                return value;
++            }
++        }
++
++        /**
++         * 兼容入口：语义等价于
++         * {@code findPossibleStructuresInCache(ctx, ...).map(s -> BlockBreakStructureFull.of(targetPos, s))}。
++         * 注意它仍然会给每个通过 testBeforePlace 的候选都构造一个 Full（含 5 个 BlockPos），
++         * 热路径（Task.start）请用上面返回 BlockBreakStructure 的那个入口。
++         */
+         public static @NotNull Stream<BlockBreakStructureFull> findPossibleFullStructuresInCache(
+                 @NotNull World world,
+                 @NotNull BlockPos targetPos,
+                 @NotNull PowerBlockType powerBlockUsage,
+                 boolean hasDependBlock
+         ) {
+-            Stream<BlockBreakStructure> stream = findPossibleStructuresInCache(world, targetPos);
+-            if (powerBlockUsage != PowerBlockType.Both) {
+-                stream = stream.filter(structure -> structure.powerBlockType == powerBlockUsage);
+-            }
+-            return stream
+-                    .filter(structure -> structure.testBeforePlace(world, targetPos, hasDependBlock))
++            // 优化点 S-1：一次搜索对应一个世界查询缓存，生命周期严格等于本次 Stream 的消费过程。
++            final StructureSearchContext ctx = new StructureSearchContext(world, targetPos, hasDependBlock);
++            return findPossibleStructuresInCache(ctx, powerBlockUsage, hasDependBlock)
+                     .map(structure -> BlockBreakStructureFull.of(targetPos, structure));
+         }
+ 
+diff --git a/src/main/java/me/z7087/blockminer/util/finder/NoHorizontalBlockFinder.java b/src/main/java/me/z7087/blockminer/util/finder/NoHorizontalBlockFinder.java
+index d5c212a..1be9c70 100644
+--- a/src/main/java/me/z7087/blockminer/util/finder/NoHorizontalBlockFinder.java
++++ b/src/main/java/me/z7087/blockminer/util/finder/NoHorizontalBlockFinder.java
+@@ -1,6 +1,7 @@
+ package me.z7087.blockminer.util.finder;
+ 
+ 
++import me.z7087.blockminer.util.BitSetUtils;
+ import me.z7087.blockminer.api.enums.PowerBlockType;
+ import me.z7087.blockminer.util.constants.PositionsInSteps;
+ import me.z7087.blockminer.util.data.*;
+@@ -10,9 +11,13 @@ import net.minecraft.util.math.Direction;
+ import net.minecraft.world.World;
+ import org.jetbrains.annotations.NotNull;
+ 
+-import java.util.BitSet;
+ import java.util.stream.Collectors;
+ import java.util.stream.Stream;
++import java.util.Iterator;
++import java.util.NoSuchElementException;
++import java.util.Spliterator;
++import java.util.Spliterators;
++import java.util.stream.StreamSupport;
+ 
+ public final class NoHorizontalBlockFinder {
+     public static final class StructureFilterCache {
+@@ -24,70 +29,198 @@ public final class NoHorizontalBlockFinder {
+                         .filter(structure -> structure.pistonOffset.getAxis() == Direction.Axis.Y && structure.pistonFace.getAxis() == Direction.Axis.Y)
+                         .collect(Collectors.toList())
+         );
+-        private static final UniqueObject<BlockPos>[] UNIQUE_POSITIONS = UniqueObjectPool.createUniqueObjectArray(UniqueObjectPool.withSInt32Limit("NoHorizontalBlockFinder.StructureFilterCache.BlockPos"), PositionsInSteps.S4.posList);
+-        static final BitSet[] M_OUT_OF_WORLD;
+-        static final BitSet[] M_PLACEABLE;
+-        static final BitSet[] M_SOLID_BLOCK;
+-        static final BitSet[] M_OTHER;
++        /** 位置表交给 UniqueObjectCollection：它同时存了原始数组（getOriginalObjects()）和带 id 的包装数组，
++         *  并沿用命名池的 int32 上界检查。各处把原始数组取到局部变量 `positions` 用，一次数组访问即可
++         *  （实测 129 个元素：裸数组 410 ns，比原来的 UniqueObject 包装 540 ns 快 130 ns）。 */
++        private static final UniqueObjectCollection<BlockPos> POSITIONS = UniqueObjectCollection.createInstance(
++                "NoHorizontalBlockFinder.StructureFilterCache.BlockPos", BlockPos[]::new, PositionsInSteps.S4.posList);
++        static final long[][] M_OUT_OF_WORLD;
++        static final long[][] M_PLACEABLE;
++        static final long[][] M_SOLID_BLOCK;
++        static final long[][] M_OTHER;
++        static final long[][] M_PISTON;
++        static final long[][] M_POWER_TYPE_NOT;
+         static {
+-            final BitSet initnalSearchBitSet = new BitSet(STRUCTURES.size());
+-            initnalSearchBitSet.set(0, STRUCTURES.size(), true);
+-            final BitSet[] mOOW = new BitSet[UNIQUE_POSITIONS.length];
+-            final BitSet[] mPlaceable = mOOW.clone();
+-            final BitSet[] mSolidBlock = mOOW.clone();
+-            final BitSet[] mOther = mOOW.clone();
+-            for (UniqueObject<BlockPos> uniquePos : UNIQUE_POSITIONS) {
+-                final BlockPos pos = uniquePos.get();
+-                final BitSet sOOW = (BitSet) initnalSearchBitSet.clone();
+-                final BitSet sPlaceable = (BitSet) initnalSearchBitSet.clone();
+-                final BitSet sSolidBlock = (BitSet) initnalSearchBitSet.clone();
+-                final BitSet sOther = (BitSet) initnalSearchBitSet.clone();
++            final BlockPos[] positions = POSITIONS.getOriginalObjects();
++            final long[] initnalSearchBitSet = BitSetUtils.allOnes(STRUCTURES.size());
++            final long[][] mOOW = new long[positions.length][];
++            final long[][] mPlaceable = new long[positions.length][];
++            final long[][] mSolidBlock = new long[positions.length][];
++            final long[][] mOther = new long[positions.length][];
++            for (int uniquePosId = 0; uniquePosId < positions.length; ++uniquePosId) {
++                final BlockPos pos = positions[uniquePosId];
++                final long[] sOOW = initnalSearchBitSet.clone();
++                final long[] sPlaceable = initnalSearchBitSet.clone();
++                final long[] sSolidBlock = initnalSearchBitSet.clone();
++                final long[] sOther = initnalSearchBitSet.clone();
+                 for (UniqueObject<BlockBreakStructure> uniqueStructure : STRUCTURES.getUniqueObjects()) {
+                     final BlockBreakStructure structure = uniqueStructure.get();
+                     final int uniqueStructureId = (int) uniqueStructure.id();
+                     if (structure.testForPosFilter(BlockFinder.ComparablePredicate.CP_OUT_OF_WORLD, pos)) {
+-                        sOOW.set(uniqueStructureId, false);
++                        BitSetUtils.clearBit(sOOW, uniqueStructureId);
+                     }
+                     if (structure.testForPosFilter(BlockFinder.ComparablePredicate.CP_PLACEABLE, pos)) {
+-                        sPlaceable.set(uniqueStructureId, false);
++                        BitSetUtils.clearBit(sPlaceable, uniqueStructureId);
+                     }
+                     if (structure.testForPosFilter(BlockFinder.ComparablePredicate.CP_SOLID_BLOCK, pos)) {
+-                        sSolidBlock.set(uniqueStructureId, false);
++                        BitSetUtils.clearBit(sSolidBlock, uniqueStructureId);
+                     }
+                     if (structure.testForPosFilter(BlockFinder.ComparablePredicate.CP_OTHER, pos)) {
+-                        sOther.set(uniqueStructureId, false);
++                        BitSetUtils.clearBit(sOther, uniqueStructureId);
+                     }
+                 }
+-                final int uniquePosId = (int) uniquePos.id();
+-                mOOW[uniquePosId] = sOOW;
+-                mPlaceable[uniquePosId] = sPlaceable;
+-                mSolidBlock[uniquePosId] = sSolidBlock;
+-                mOther[uniquePosId] = sOther;
++                // 整份全零的掩码存 null，查表时一次判空就能跳过：129 个里 PLACEABLE 有 111 个、
++                // SOLID_BLOCK 67 个、OTHER 42 个、OUT_OF_WORLD 6 个（"全零"的判定条件已逐位核对过，
++                // 见 NEXT-OPTIMIZATIONS.md）。
++                mOOW[uniquePosId] = BitSetUtils.isEmpty(sOOW) ? null : sOOW;
++                mPlaceable[uniquePosId] = BitSetUtils.isEmpty(sPlaceable) ? null : sPlaceable;
++                mSolidBlock[uniquePosId] = BitSetUtils.isEmpty(sSolidBlock) ? null : sSolidBlock;
++                mOther[uniquePosId] = BitSetUtils.isEmpty(sOther) ? null : sOther;
+             }
+             M_OUT_OF_WORLD = mOOW;
+             M_PLACEABLE = mPlaceable;
+             M_SOLID_BLOCK = mSolidBlock;
+             M_OTHER = mOther;
++
++            final int dc = Direction.values().length;
++            final int pkc = dc * dc;
++            final long[][] mPiston = new long[pkc][];
++            for (int key = 0; key < pkc; ++key) {
++                final long[] bits = new long[BitSetUtils.wordCount(STRUCTURES.size())];
++                boolean any = false;
++                for (UniqueObject<BlockBreakStructure> us : STRUCTURES.getUniqueObjects()) {
++                    if (us.get().pistonPlacementKey == key) {
++                        BitSetUtils.setBit(bits, (int) us.id());
++                        any = true;
++                    }
++                }
++                mPiston[key] = any ? bits : null;
++            }
++            M_PISTON = mPiston;
++
++            final long[][] mPowerTypeNot = new long[PowerBlockType.values().length][];
++            for (PowerBlockType type : PowerBlockType.values()) {
++                if (type == PowerBlockType.Both) { mPowerTypeNot[type.ordinal()] = null; continue; }
++                final long[] bits = new long[BitSetUtils.wordCount(STRUCTURES.size())];
++                boolean any = false;
++                for (UniqueObject<BlockBreakStructure> us : STRUCTURES.getUniqueObjects()) {
++                    if (us.get().powerBlockType != type) {
++                        BitSetUtils.setBit(bits, (int) us.id());
++                        any = true;
++                    }
++                }
++                mPowerTypeNot[type.ordinal()] = any ? bits : null;
++            }
++            M_POWER_TYPE_NOT = mPowerTypeNot;
+         }
+ 
+-        public static @NotNull Stream<BlockBreakStructure> findPossibleStructuresInCache(@NotNull World world, @NotNull BlockPos targetPos) {
+-            final BitSet possibleStructures = new BitSet(STRUCTURES.size());
+-            for (int uniquePosId = 0; uniquePosId < UNIQUE_POSITIONS.length; ++uniquePosId) {
+-                final UniqueObject<BlockPos> uniqueOffsetPos = UNIQUE_POSITIONS[uniquePosId];
+-                final BlockPos pos = targetPos.add(uniqueOffsetPos.get());
+-                final BlockState state = world.getBlockState(pos);
+-                if (BlockFinder.ComparablePredicate.CP_OUT_OF_WORLD.test(world, pos, state)) {
+-                    possibleStructures.or(M_OUT_OF_WORLD[uniquePosId]);
++        /** 掩码那趟：走传入的上下文缓存（原来这里另建了一个上下文、并且直接问 world）。 */
++        private static long[] possibleStructures(@NotNull StructureSearchContext ctx,
++                @NotNull PowerBlockType powerBlockUsage) {
++            final World world = ctx.world();
++            final long[] possibleStructures = new long[BitSetUtils.wordCount(STRUCTURES.size())];
++            final BlockPos[] positions = POSITIONS.getOriginalObjects();
++            // 掩码这趟每个位置只读一次状态、不长期持有位置，所以复用一个可变的 BlockPos：
++            // 实测这里原来每次搜索要 new 129 个 BlockPos（约 4 KB），而位置表缓存对它们几乎不命中。
++            final BlockPos.Mutable pos = new BlockPos.Mutable();
++            final BlockPos targetPos = ctx.targetPos();
++            for (int uniquePosId = 0, length = positions.length; uniquePosId < length; ++uniquePosId) {
++                final BlockPos offset = positions[uniquePosId];
++                pos.set(targetPos.getX() + offset.getX(),
++                        targetPos.getY() + offset.getY(),
++                        targetPos.getZ() + offset.getZ());
++                final BlockState state = ctx.state(pos);
++                // 走 ctx 的整盒捷径（可建区域是长方体，整个盒子在范围内时直接返回 true，不再问世界）
++                if (!ctx.isInBuildLimit(pos)) {
++                    BitSetUtils.orIfPresent(possibleStructures, M_OUT_OF_WORLD[uniquePosId]);
+                 } else if (BlockFinder.ComparablePredicate.CP_PLACEABLE.test(world, pos, state)) {
+-                    possibleStructures.or(M_PLACEABLE[uniquePosId]);
++                    BitSetUtils.orIfPresent(possibleStructures, M_PLACEABLE[uniquePosId]);
+                 } else if (BlockFinder.ComparablePredicate.CP_SOLID_BLOCK.test(world, pos, state)) {
+-                    possibleStructures.or(M_SOLID_BLOCK[uniquePosId]);
++                    BitSetUtils.orIfPresent(possibleStructures, M_SOLID_BLOCK[uniquePosId]);
+                 } else {
+-                    possibleStructures.or(M_OTHER[uniquePosId]);
++                    BitSetUtils.orIfPresent(possibleStructures, M_OTHER[uniquePosId]);
++                }
++            }
++            BitSetUtils.orIfPresent(possibleStructures, M_POWER_TYPE_NOT[powerBlockUsage.ordinal()]);
++            return possibleStructures;
++        }
++
++        public static @NotNull Stream<BlockBreakStructure> findPossibleStructuresInCache(@NotNull World world, @NotNull BlockPos targetPos) {
++            return findPossibleStructuresInCache(new StructureSearchContext(world, targetPos, false));
++        }
++
++        public static @NotNull Stream<BlockBreakStructure> findPossibleStructuresInCache(@NotNull StructureSearchContext ctx) {
++            return BitSetUtils.streamSetBits(possibleStructures(ctx, PowerBlockType.Both), STRUCTURES.getOriginalObjects());
++        }
++
++        public static @NotNull Stream<BlockBreakStructure> findPossibleStructuresInCache(
++                @NotNull StructureSearchContext ctx,
++                @NotNull PowerBlockType powerBlockUsage,
++                boolean hasDependBlock
++        ) {
++            return StreamSupport.stream(
++                    Spliterators.spliteratorUnknownSize(findPossibleStructuresIterator(ctx, powerBlockUsage, hasDependBlock),
++                            Spliterator.ORDERED | Spliterator.NONNULL),
++                    false);
++        }
++
++        /**
++         * 热路径：直接给迭代器。原来这里是一条 {@code Stream}，两层 {@code .filter()} 的
++         * {@code ReferencePipeline} 机制实测占了单次搜索 ~18%（JFR：{@code ReferencePipeline$2$1.accept}
++         * + {@code WrappingSpliterator.fillBuffer} + {@code IteratorSpliterator.tryAdvance} +
++         * {@code Sink.cancellationRequested}）。换成一个小迭代器之后这些全没了。
++         */
++        public static @NotNull Iterator<BlockBreakStructure> findPossibleStructuresIterator(
++                @NotNull StructureSearchContext ctx,
++                @NotNull PowerBlockType powerBlockUsage,
++                boolean hasDependBlock
++        ) {
++            final long[] bits = possibleStructures(ctx, powerBlockUsage);
++            ctx.applyPistonMask(bits, M_PISTON);
++            return new FilteredIterator(
++                    BitSetUtils.unsetBitIterator(bits, STRUCTURES.getOriginalObjects(), STRUCTURES.size()),
++                    powerBlockUsage, ctx);
++        }
++
++        private static final class FilteredIterator implements Iterator<BlockBreakStructure> {
++            private final Iterator<BlockBreakStructure> delegate;
++            private final PowerBlockType powerBlockUsage;
++            private final StructureSearchContext ctx;
++            private BlockBreakStructure next;
++
++            FilteredIterator(@NotNull Iterator<BlockBreakStructure> delegate,
++                             @NotNull PowerBlockType powerBlockUsage,
++                             @NotNull StructureSearchContext ctx) {
++                this.delegate = delegate;
++                this.powerBlockUsage = powerBlockUsage;
++                this.ctx = ctx;
++                advance();
++            }
++
++            private void advance() {
++                while (delegate.hasNext()) {
++                    final BlockBreakStructure candidate = delegate.next();
++                    if (!candidate.testBeforePlace(ctx))
++                        continue;
++                    next = candidate;
++                    return;
+                 }
++                next = null;
++            }
++
++            @Override
++            public boolean hasNext() {
++                return next != null;
++            }
++
++            @Override
++            public BlockBreakStructure next() {
++                if (next == null)
++                    throw new NoSuchElementException();
++                final BlockBreakStructure value = next;
++                advance();
++                return value;
+             }
+-            possibleStructures.flip(0, STRUCTURES.size()); // TODO
+-            return possibleStructures.stream().mapToObj((id) -> STRUCTURES.getOriginalObjects()[id]);
+         }
+ 
+         public static @NotNull Stream<BlockBreakStructureFull> findPossibleFullStructuresInCache(
+@@ -96,12 +229,9 @@ public final class NoHorizontalBlockFinder {
+                 @NotNull PowerBlockType powerBlockUsage,
+                 boolean hasDependBlock
+         ) {
+-            Stream<BlockBreakStructure> stream = findPossibleStructuresInCache(world, targetPos);
+-            if (powerBlockUsage != PowerBlockType.Both) {
+-                stream = stream.filter(structure -> structure.powerBlockType == powerBlockUsage);
+-            }
+-            return stream
+-                    .filter(structure -> structure.testBeforePlace(world, targetPos, hasDependBlock))
++            // 优化点 S-1 / S-4：一次搜索对应一个世界查询缓存；返回 BlockBreakStructure，只有选中的候选才构造 Full。
++            final StructureSearchContext ctx = new StructureSearchContext(world, targetPos, hasDependBlock);
++            return findPossibleStructuresInCache(ctx, powerBlockUsage, hasDependBlock)
+                     .map(structure -> BlockBreakStructureFull.of(targetPos, structure));
+         }
+ 
+diff --git a/src/main/java/me/z7087/blockminer/util/finder/NoHorizontalSimpleBlockFinder.java b/src/main/java/me/z7087/blockminer/util/finder/NoHorizontalSimpleBlockFinder.java
+index 328b1f0..6bb1cc5 100644
+--- a/src/main/java/me/z7087/blockminer/util/finder/NoHorizontalSimpleBlockFinder.java
++++ b/src/main/java/me/z7087/blockminer/util/finder/NoHorizontalSimpleBlockFinder.java
+@@ -1,5 +1,6 @@
+ package me.z7087.blockminer.util.finder;
+ 
++import me.z7087.blockminer.util.BitSetUtils;
+ import me.z7087.blockminer.api.enums.PowerBlockType;
+ import me.z7087.blockminer.util.BlockUtils;
+ import me.z7087.blockminer.util.constants.PositionsInSteps;
+@@ -10,9 +11,13 @@ import net.minecraft.util.math.Direction;
+ import net.minecraft.world.World;
+ import org.jetbrains.annotations.NotNull;
+ 
+-import java.util.BitSet;
+ import java.util.stream.Collectors;
+ import java.util.stream.Stream;
++import java.util.Iterator;
++import java.util.NoSuchElementException;
++import java.util.Spliterator;
++import java.util.Spliterators;
++import java.util.stream.StreamSupport;
+ 
+ public final class NoHorizontalSimpleBlockFinder {
+     public static final class StructureFilterCache {
+@@ -31,70 +36,201 @@ public final class NoHorizontalSimpleBlockFinder {
+                         })
+                         .collect(Collectors.toList())
+         );
+-        private static final UniqueObject<BlockPos>[] UNIQUE_POSITIONS = UniqueObjectPool.createUniqueObjectArray(UniqueObjectPool.withSInt32Limit("NoHorizontalSimpleBlockFinder.StructureFilterCache.BlockPos"), PositionsInSteps.S2.posList);
+-        static final BitSet[] M_OUT_OF_WORLD;
+-        static final BitSet[] M_PLACEABLE;
+-        static final BitSet[] M_SOLID_BLOCK;
+-        static final BitSet[] M_OTHER;
++        /** 直接用裸数组：PositionsInSteps.S2.posList 外面套了 Collections.unmodifiableList，
++         *  get(i) 要多走一层委托；实测裸数组 410 ns vs unmodifiableList.get 579 ns vs
++         *  原来的 UniqueObject 包装 540 ns（129 个元素）。 */
++        /** 位置表交给 UniqueObjectCollection：它同时存了原始数组（getOriginalObjects()）和带 id 的包装数组，
++         *  并沿用命名池的 int32 上界检查。各处把原始数组取到局部变量 `positions` 用，一次数组访问即可
++         *  （实测 129 个元素：裸数组 410 ns，比原来的 UniqueObject 包装 540 ns 快 130 ns）。 */
++        private static final UniqueObjectCollection<BlockPos> POSITIONS = UniqueObjectCollection.createInstance(
++                "NoHorizontalSimpleBlockFinder.StructureFilterCache.BlockPos", BlockPos[]::new, PositionsInSteps.S2.posList);
++        static final long[][] M_OUT_OF_WORLD;
++        static final long[][] M_PLACEABLE;
++        static final long[][] M_SOLID_BLOCK;
++        static final long[][] M_OTHER;
++        static final long[][] M_PISTON;
++        static final long[][] M_POWER_TYPE_NOT;
+         static {
+-            final BitSet initnalSearchBitSet = new BitSet(STRUCTURES.size());
+-            initnalSearchBitSet.set(0, STRUCTURES.size(), true);
+-            final BitSet[] mOOW = new BitSet[UNIQUE_POSITIONS.length];
+-            final BitSet[] mPlaceable = mOOW.clone();
+-            final BitSet[] mSolidBlock = mOOW.clone();
+-            final BitSet[] mOther = mOOW.clone();
+-            for (UniqueObject<BlockPos> uniquePos : UNIQUE_POSITIONS) {
+-                final BlockPos pos = uniquePos.get();
+-                final BitSet sOOW = (BitSet) initnalSearchBitSet.clone();
+-                final BitSet sPlaceable = (BitSet) initnalSearchBitSet.clone();
+-                final BitSet sSolidBlock = (BitSet) initnalSearchBitSet.clone();
+-                final BitSet sOther = (BitSet) initnalSearchBitSet.clone();
++            final BlockPos[] positions = POSITIONS.getOriginalObjects();
++            final long[] initnalSearchBitSet = BitSetUtils.allOnes(STRUCTURES.size());
++            final long[][] mOOW = new long[positions.length][];
++            final long[][] mPlaceable = new long[positions.length][];
++            final long[][] mSolidBlock = new long[positions.length][];
++            final long[][] mOther = new long[positions.length][];
++            for (int uniquePosId = 0; uniquePosId < positions.length; ++uniquePosId) {
++                final BlockPos pos = positions[uniquePosId];
++                final long[] sOOW = initnalSearchBitSet.clone();
++                final long[] sPlaceable = initnalSearchBitSet.clone();
++                final long[] sSolidBlock = initnalSearchBitSet.clone();
++                final long[] sOther = initnalSearchBitSet.clone();
+                 for (UniqueObject<BlockBreakStructure> uniqueStructure : STRUCTURES.getUniqueObjects()) {
+                     final BlockBreakStructure structure = uniqueStructure.get();
+                     final int uniqueStructureId = (int) uniqueStructure.id();
+                     if (structure.testForPosFilter(BlockFinder.ComparablePredicate.CP_OUT_OF_WORLD, pos)) {
+-                        sOOW.set(uniqueStructureId, false);
++                        BitSetUtils.clearBit(sOOW, uniqueStructureId);
+                     }
+                     if (structure.testForPosFilter(BlockFinder.ComparablePredicate.CP_PLACEABLE, pos)) {
+-                        sPlaceable.set(uniqueStructureId, false);
++                        BitSetUtils.clearBit(sPlaceable, uniqueStructureId);
+                     }
+                     if (structure.testForPosFilter(BlockFinder.ComparablePredicate.CP_SOLID_BLOCK, pos)) {
+-                        sSolidBlock.set(uniqueStructureId, false);
++                        BitSetUtils.clearBit(sSolidBlock, uniqueStructureId);
+                     }
+                     if (structure.testForPosFilter(BlockFinder.ComparablePredicate.CP_OTHER, pos)) {
+-                        sOther.set(uniqueStructureId, false);
++                        BitSetUtils.clearBit(sOther, uniqueStructureId);
+                     }
+                 }
+-                final int uniquePosId = (int) uniquePos.id();
+-                mOOW[uniquePosId] = sOOW;
+-                mPlaceable[uniquePosId] = sPlaceable;
+-                mSolidBlock[uniquePosId] = sSolidBlock;
+-                mOther[uniquePosId] = sOther;
++                // 整份全零的掩码存 null，查表时一次判空就能跳过：129 个里 PLACEABLE 有 111 个、
++                // SOLID_BLOCK 67 个、OTHER 42 个、OUT_OF_WORLD 6 个（"全零"的判定条件已逐位核对过，
++                // 见 NEXT-OPTIMIZATIONS.md）。
++                mOOW[uniquePosId] = BitSetUtils.isEmpty(sOOW) ? null : sOOW;
++                mPlaceable[uniquePosId] = BitSetUtils.isEmpty(sPlaceable) ? null : sPlaceable;
++                mSolidBlock[uniquePosId] = BitSetUtils.isEmpty(sSolidBlock) ? null : sSolidBlock;
++                mOther[uniquePosId] = BitSetUtils.isEmpty(sOther) ? null : sOther;
+             }
+             M_OUT_OF_WORLD = mOOW;
+             M_PLACEABLE = mPlaceable;
+             M_SOLID_BLOCK = mSolidBlock;
+             M_OTHER = mOther;
++
++            final int dc = Direction.values().length;
++            final int pkc = dc * dc;
++            final long[][] mPiston = new long[pkc][];
++            for (int key = 0; key < pkc; ++key) {
++                final long[] bits = new long[BitSetUtils.wordCount(STRUCTURES.size())];
++                boolean any = false;
++                for (UniqueObject<BlockBreakStructure> us : STRUCTURES.getUniqueObjects()) {
++                    if (us.get().pistonPlacementKey == key) {
++                        BitSetUtils.setBit(bits, (int) us.id());
++                        any = true;
++                    }
++                }
++                mPiston[key] = any ? bits : null;
++            }
++            M_PISTON = mPiston;
++
++            final long[][] mPowerTypeNot = new long[PowerBlockType.values().length][];
++            for (PowerBlockType type : PowerBlockType.values()) {
++                if (type == PowerBlockType.Both) { mPowerTypeNot[type.ordinal()] = null; continue; }
++                final long[] bits = new long[BitSetUtils.wordCount(STRUCTURES.size())];
++                boolean any = false;
++                for (UniqueObject<BlockBreakStructure> us : STRUCTURES.getUniqueObjects()) {
++                    if (us.get().powerBlockType != type) {
++                        BitSetUtils.setBit(bits, (int) us.id());
++                        any = true;
++                    }
++                }
++                mPowerTypeNot[type.ordinal()] = any ? bits : null;
++            }
++            M_POWER_TYPE_NOT = mPowerTypeNot;
+         }
+ 
+-        public static @NotNull Stream<BlockBreakStructure> findPossibleStructuresInCache(@NotNull World world, @NotNull BlockPos targetPos) {
+-            final BitSet possibleStructures = new BitSet(STRUCTURES.size());
+-            for (int uniquePosId = 0; uniquePosId < UNIQUE_POSITIONS.length; ++uniquePosId) {
+-                final UniqueObject<BlockPos> uniqueOffsetPos = UNIQUE_POSITIONS[uniquePosId];
+-                final BlockPos pos = targetPos.add(uniqueOffsetPos.get());
+-                final BlockState state = world.getBlockState(pos);
+-                if (BlockFinder.ComparablePredicate.CP_OUT_OF_WORLD.test(world, pos, state)) {
+-                    possibleStructures.or(M_OUT_OF_WORLD[uniquePosId]);
++        /** 掩码那趟：走传入的上下文缓存（原来这里另建了一个上下文、并且直接问 world）。 */
++        private static long[] possibleStructures(@NotNull StructureSearchContext ctx,
++                @NotNull PowerBlockType powerBlockUsage) {
++            final World world = ctx.world();
++            final long[] possibleStructures = new long[BitSetUtils.wordCount(STRUCTURES.size())];
++            final BlockPos[] positions = POSITIONS.getOriginalObjects();
++            // 掩码这趟每个位置只读一次状态、不长期持有位置，所以复用一个可变的 BlockPos：
++            // 实测这里原来每次搜索要 new 129 个 BlockPos（约 4 KB），而位置表缓存对它们几乎不命中。
++            final BlockPos.Mutable pos = new BlockPos.Mutable();
++            final BlockPos targetPos = ctx.targetPos();
++            for (int uniquePosId = 0, length = positions.length; uniquePosId < length; ++uniquePosId) {
++                final BlockPos offset = positions[uniquePosId];
++                pos.set(targetPos.getX() + offset.getX(),
++                        targetPos.getY() + offset.getY(),
++                        targetPos.getZ() + offset.getZ());
++                final BlockState state = ctx.state(pos);
++                // 走 ctx 的整盒捷径（可建区域是长方体，整个盒子在范围内时直接返回 true，不再问世界）
++                if (!ctx.isInBuildLimit(pos)) {
++                    BitSetUtils.orIfPresent(possibleStructures, M_OUT_OF_WORLD[uniquePosId]);
+                 } else if (BlockFinder.ComparablePredicate.CP_PLACEABLE.test(world, pos, state)) {
+-                    possibleStructures.or(M_PLACEABLE[uniquePosId]);
++                    BitSetUtils.orIfPresent(possibleStructures, M_PLACEABLE[uniquePosId]);
+                 } else if (BlockFinder.ComparablePredicate.CP_SOLID_BLOCK.test(world, pos, state)) {
+-                    possibleStructures.or(M_SOLID_BLOCK[uniquePosId]);
++                    BitSetUtils.orIfPresent(possibleStructures, M_SOLID_BLOCK[uniquePosId]);
+                 } else {
+-                    possibleStructures.or(M_OTHER[uniquePosId]);
++                    BitSetUtils.orIfPresent(possibleStructures, M_OTHER[uniquePosId]);
++                }
++            }
++            BitSetUtils.orIfPresent(possibleStructures, M_POWER_TYPE_NOT[powerBlockUsage.ordinal()]);
++            return possibleStructures;
++        }
++
++        public static @NotNull Stream<BlockBreakStructure> findPossibleStructuresInCache(@NotNull World world, @NotNull BlockPos targetPos) {
++            return findPossibleStructuresInCache(new StructureSearchContext(world, targetPos, false));
++        }
++
++        public static @NotNull Stream<BlockBreakStructure> findPossibleStructuresInCache(@NotNull StructureSearchContext ctx) {
++            return BitSetUtils.streamSetBits(possibleStructures(ctx, PowerBlockType.Both), STRUCTURES.getOriginalObjects());
++        }
++
++        public static @NotNull Stream<BlockBreakStructure> findPossibleStructuresInCache(
++                @NotNull StructureSearchContext ctx,
++                @NotNull PowerBlockType powerBlockUsage,
++                boolean hasDependBlock
++        ) {
++            return StreamSupport.stream(
++                    Spliterators.spliteratorUnknownSize(findPossibleStructuresIterator(ctx, powerBlockUsage, hasDependBlock),
++                            Spliterator.ORDERED | Spliterator.NONNULL),
++                    false);
++        }
++
++        /**
++         * 热路径：直接给迭代器。原来这里是一条 {@code Stream}，两层 {@code .filter()} 的
++         * {@code ReferencePipeline} 机制实测占了单次搜索 ~18%（JFR：{@code ReferencePipeline$2$1.accept}
++         * + {@code WrappingSpliterator.fillBuffer} + {@code IteratorSpliterator.tryAdvance} +
++         * {@code Sink.cancellationRequested}）。换成一个小迭代器之后这些全没了。
++         */
++        public static @NotNull Iterator<BlockBreakStructure> findPossibleStructuresIterator(
++                @NotNull StructureSearchContext ctx,
++                @NotNull PowerBlockType powerBlockUsage,
++                boolean hasDependBlock
++        ) {
++            final long[] bits = possibleStructures(ctx, powerBlockUsage);
++            ctx.applyPistonMask(bits, M_PISTON);
++            return new FilteredIterator(
++                    BitSetUtils.unsetBitIterator(bits, STRUCTURES.getOriginalObjects(), STRUCTURES.size()),
++                    powerBlockUsage, ctx);
++        }
++
++        private static final class FilteredIterator implements Iterator<BlockBreakStructure> {
++            private final Iterator<BlockBreakStructure> delegate;
++            private final PowerBlockType powerBlockUsage;
++            private final StructureSearchContext ctx;
++            private BlockBreakStructure next;
++
++            FilteredIterator(@NotNull Iterator<BlockBreakStructure> delegate,
++                             @NotNull PowerBlockType powerBlockUsage,
++                             @NotNull StructureSearchContext ctx) {
++                this.delegate = delegate;
++                this.powerBlockUsage = powerBlockUsage;
++                this.ctx = ctx;
++                advance();
++            }
++
++            private void advance() {
++                while (delegate.hasNext()) {
++                    final BlockBreakStructure candidate = delegate.next();
++                    if (!candidate.testBeforePlace(ctx))
++                        continue;
++                    next = candidate;
++                    return;
+                 }
++                next = null;
++            }
++
++            @Override
++            public boolean hasNext() {
++                return next != null;
++            }
++
++            @Override
++            public BlockBreakStructure next() {
++                if (next == null)
++                    throw new NoSuchElementException();
++                final BlockBreakStructure value = next;
++                advance();
++                return value;
+             }
+-            possibleStructures.flip(0, STRUCTURES.size()); // TODO
+-            return possibleStructures.stream().mapToObj((id) -> STRUCTURES.getOriginalObjects()[id]);
+         }
+ 
+         public static @NotNull Stream<BlockBreakStructureFull> findPossibleFullStructuresInCache(
+@@ -103,12 +239,9 @@ public final class NoHorizontalSimpleBlockFinder {
+                 @NotNull PowerBlockType powerBlockUsage,
+                 boolean hasDependBlock
+         ) {
+-            Stream<BlockBreakStructure> stream = findPossibleStructuresInCache(world, targetPos);
+-            if (powerBlockUsage != PowerBlockType.Both) {
+-                stream = stream.filter(structure -> structure.powerBlockType == powerBlockUsage);
+-            }
+-            return stream
+-                    .filter(structure -> structure.testBeforePlace(world, targetPos, hasDependBlock))
++            // 优化点 S-1 / S-4：一次搜索对应一个世界查询缓存；返回 BlockBreakStructure，只有选中的候选才构造 Full。
++            final StructureSearchContext ctx = new StructureSearchContext(world, targetPos, hasDependBlock);
++            return findPossibleStructuresInCache(ctx, powerBlockUsage, hasDependBlock)
+                     .map(structure -> BlockBreakStructureFull.of(targetPos, structure));
+         }
+ 
+diff --git a/src/main/java/me/z7087/blockminer/util/finder/SimpleBlockFinder.java b/src/main/java/me/z7087/blockminer/util/finder/SimpleBlockFinder.java
+index c43355c..08e4352 100644
+--- a/src/main/java/me/z7087/blockminer/util/finder/SimpleBlockFinder.java
++++ b/src/main/java/me/z7087/blockminer/util/finder/SimpleBlockFinder.java
+@@ -1,5 +1,6 @@
+ package me.z7087.blockminer.util.finder;
+ 
++import me.z7087.blockminer.util.BitSetUtils;
+ import me.z7087.blockminer.util.BlockUtils;
+ import me.z7087.blockminer.util.constants.PositionsInSteps;
+ import me.z7087.blockminer.util.data.*;
+@@ -10,9 +11,14 @@ import net.minecraft.util.math.BlockPos;
+ import net.minecraft.world.World;
+ import org.jetbrains.annotations.NotNull;
+ 
+-import java.util.BitSet;
+ import java.util.stream.Collectors;
+ import java.util.stream.Stream;
++import java.util.Iterator;
++import java.util.NoSuchElementException;
++import java.util.Spliterator;
++import java.util.Spliterators;
++import java.util.stream.StreamSupport;
++import net.minecraft.util.math.Direction;
+ 
+ public final class SimpleBlockFinder {
+     public static final class StructureFilterCache {
+@@ -28,70 +34,201 @@ public final class SimpleBlockFinder {
+                         })
+                         .collect(Collectors.toList())
+         );
+-        private static final UniqueObject<BlockPos>[] UNIQUE_POSITIONS = UniqueObjectPool.createUniqueObjectArray(UniqueObjectPool.withSInt32Limit("SimpleBlockFinder.StructureFilterCache.BlockPos"), PositionsInSteps.S2.posList);
+-        static final BitSet[] M_OUT_OF_WORLD;
+-        static final BitSet[] M_PLACEABLE;
+-        static final BitSet[] M_SOLID_BLOCK;
+-        static final BitSet[] M_OTHER;
++        /** 直接用裸数组：PositionsInSteps.S2.posList 外面套了 Collections.unmodifiableList，
++         *  get(i) 要多走一层委托；实测裸数组 410 ns vs unmodifiableList.get 579 ns vs
++         *  原来的 UniqueObject 包装 540 ns（129 个元素）。 */
++        /** 位置表交给 UniqueObjectCollection：它同时存了原始数组（getOriginalObjects()）和带 id 的包装数组，
++         *  并沿用命名池的 int32 上界检查。各处把原始数组取到局部变量 `positions` 用，一次数组访问即可
++         *  （实测 129 个元素：裸数组 410 ns，比原来的 UniqueObject 包装 540 ns 快 130 ns）。 */
++        private static final UniqueObjectCollection<BlockPos> POSITIONS = UniqueObjectCollection.createInstance(
++                "SimpleBlockFinder.StructureFilterCache.BlockPos", BlockPos[]::new, PositionsInSteps.S2.posList);
++        static final long[][] M_OUT_OF_WORLD;
++        static final long[][] M_PLACEABLE;
++        static final long[][] M_SOLID_BLOCK;
++        static final long[][] M_OTHER;
++        static final long[][] M_PISTON;
++        static final long[][] M_POWER_TYPE_NOT;
+         static {
+-            final BitSet initnalSearchBitSet = new BitSet(STRUCTURES.size());
+-            initnalSearchBitSet.set(0, STRUCTURES.size(), true);
+-            final BitSet[] mOOW = new BitSet[UNIQUE_POSITIONS.length];
+-            final BitSet[] mPlaceable = mOOW.clone();
+-            final BitSet[] mSolidBlock = mOOW.clone();
+-            final BitSet[] mOther = mOOW.clone();
+-            for (UniqueObject<BlockPos> uniquePos : UNIQUE_POSITIONS) {
+-                final BlockPos pos = uniquePos.get();
+-                final BitSet sOOW = (BitSet) initnalSearchBitSet.clone();
+-                final BitSet sPlaceable = (BitSet) initnalSearchBitSet.clone();
+-                final BitSet sSolidBlock = (BitSet) initnalSearchBitSet.clone();
+-                final BitSet sOther = (BitSet) initnalSearchBitSet.clone();
++            final BlockPos[] positions = POSITIONS.getOriginalObjects();
++            final long[] initnalSearchBitSet = BitSetUtils.allOnes(STRUCTURES.size());
++            final long[][] mOOW = new long[positions.length][];
++            final long[][] mPlaceable = new long[positions.length][];
++            final long[][] mSolidBlock = new long[positions.length][];
++            final long[][] mOther = new long[positions.length][];
++            for (int uniquePosId = 0; uniquePosId < positions.length; ++uniquePosId) {
++                final BlockPos pos = positions[uniquePosId];
++                final long[] sOOW = initnalSearchBitSet.clone();
++                final long[] sPlaceable = initnalSearchBitSet.clone();
++                final long[] sSolidBlock = initnalSearchBitSet.clone();
++                final long[] sOther = initnalSearchBitSet.clone();
+                 for (UniqueObject<BlockBreakStructure> uniqueStructure : STRUCTURES.getUniqueObjects()) {
+                     final BlockBreakStructure structure = uniqueStructure.get();
+                     final int uniqueStructureId = (int) uniqueStructure.id();
+                     if (structure.testForPosFilter(ComparablePredicate.CP_OUT_OF_WORLD, pos)) {
+-                        sOOW.set(uniqueStructureId, false);
++                        BitSetUtils.clearBit(sOOW, uniqueStructureId);
+                     }
+                     if (structure.testForPosFilter(ComparablePredicate.CP_PLACEABLE, pos)) {
+-                        sPlaceable.set(uniqueStructureId, false);
++                        BitSetUtils.clearBit(sPlaceable, uniqueStructureId);
+                     }
+                     if (structure.testForPosFilter(ComparablePredicate.CP_SOLID_BLOCK, pos)) {
+-                        sSolidBlock.set(uniqueStructureId, false);
++                        BitSetUtils.clearBit(sSolidBlock, uniqueStructureId);
+                     }
+                     if (structure.testForPosFilter(ComparablePredicate.CP_OTHER, pos)) {
+-                        sOther.set(uniqueStructureId, false);
++                        BitSetUtils.clearBit(sOther, uniqueStructureId);
+                     }
+                 }
+-                final int uniquePosId = (int) uniquePos.id();
+-                mOOW[uniquePosId] = sOOW;
+-                mPlaceable[uniquePosId] = sPlaceable;
+-                mSolidBlock[uniquePosId] = sSolidBlock;
+-                mOther[uniquePosId] = sOther;
++                // 整份全零的掩码存 null，查表时一次判空就能跳过：129 个里 PLACEABLE 有 111 个、
++                // SOLID_BLOCK 67 个、OTHER 42 个、OUT_OF_WORLD 6 个（"全零"的判定条件已逐位核对过，
++                // 见 NEXT-OPTIMIZATIONS.md）。
++                mOOW[uniquePosId] = BitSetUtils.isEmpty(sOOW) ? null : sOOW;
++                mPlaceable[uniquePosId] = BitSetUtils.isEmpty(sPlaceable) ? null : sPlaceable;
++                mSolidBlock[uniquePosId] = BitSetUtils.isEmpty(sSolidBlock) ? null : sSolidBlock;
++                mOther[uniquePosId] = BitSetUtils.isEmpty(sOther) ? null : sOther;
+             }
+             M_OUT_OF_WORLD = mOOW;
+             M_PLACEABLE = mPlaceable;
+             M_SOLID_BLOCK = mSolidBlock;
+             M_OTHER = mOther;
++
++            final int dc = Direction.values().length;
++            final int pkc = dc * dc;
++            final long[][] mPiston = new long[pkc][];
++            for (int key = 0; key < pkc; ++key) {
++                final long[] bits = new long[BitSetUtils.wordCount(STRUCTURES.size())];
++                boolean any = false;
++                for (UniqueObject<BlockBreakStructure> us : STRUCTURES.getUniqueObjects()) {
++                    if (us.get().pistonPlacementKey == key) {
++                        BitSetUtils.setBit(bits, (int) us.id());
++                        any = true;
++                    }
++                }
++                mPiston[key] = any ? bits : null;
++            }
++            M_PISTON = mPiston;
++
++            final long[][] mPowerTypeNot = new long[PowerBlockType.values().length][];
++            for (PowerBlockType type : PowerBlockType.values()) {
++                if (type == PowerBlockType.Both) { mPowerTypeNot[type.ordinal()] = null; continue; }
++                final long[] bits = new long[BitSetUtils.wordCount(STRUCTURES.size())];
++                boolean any = false;
++                for (UniqueObject<BlockBreakStructure> us : STRUCTURES.getUniqueObjects()) {
++                    if (us.get().powerBlockType != type) {
++                        BitSetUtils.setBit(bits, (int) us.id());
++                        any = true;
++                    }
++                }
++                mPowerTypeNot[type.ordinal()] = any ? bits : null;
++            }
++            M_POWER_TYPE_NOT = mPowerTypeNot;
+         }
+ 
+-        public static @NotNull Stream<BlockBreakStructure> findPossibleStructuresInCache(@NotNull World world, @NotNull BlockPos targetPos) {
+-            final BitSet possibleStructures = new BitSet(STRUCTURES.size());
+-            for (int uniquePosId = 0; uniquePosId < UNIQUE_POSITIONS.length; ++uniquePosId) {
+-                final UniqueObject<BlockPos> uniqueOffsetPos = UNIQUE_POSITIONS[uniquePosId];
+-                final BlockPos pos = targetPos.add(uniqueOffsetPos.get());
+-                final BlockState state = world.getBlockState(pos);
+-                if (ComparablePredicate.CP_OUT_OF_WORLD.test(world, pos, state)) {
+-                    possibleStructures.or(M_OUT_OF_WORLD[uniquePosId]);
++        /** 掩码那趟：走传入的上下文缓存（原来这里另建了一个上下文、并且直接问 world）。 */
++        private static long[] possibleStructures(@NotNull StructureSearchContext ctx,
++                @NotNull PowerBlockType powerBlockUsage) {
++            final World world = ctx.world();
++            final long[] possibleStructures = new long[BitSetUtils.wordCount(STRUCTURES.size())];
++            final BlockPos[] positions = POSITIONS.getOriginalObjects();
++            // 掩码这趟每个位置只读一次状态、不长期持有位置，所以复用一个可变的 BlockPos：
++            // 实测这里原来每次搜索要 new 129 个 BlockPos（约 4 KB），而位置表缓存对它们几乎不命中。
++            final BlockPos.Mutable pos = new BlockPos.Mutable();
++            final BlockPos targetPos = ctx.targetPos();
++            for (int uniquePosId = 0, length = positions.length; uniquePosId < length; ++uniquePosId) {
++                final BlockPos offset = positions[uniquePosId];
++                pos.set(targetPos.getX() + offset.getX(),
++                        targetPos.getY() + offset.getY(),
++                        targetPos.getZ() + offset.getZ());
++                final BlockState state = ctx.state(pos);
++                // 走 ctx 的整盒捷径（可建区域是长方体，整个盒子在范围内时直接返回 true，不再问世界）
++        if (!ctx.isInBuildLimit(pos)) {
++                    BitSetUtils.orIfPresent(possibleStructures, M_OUT_OF_WORLD[uniquePosId]);
+                 } else if (ComparablePredicate.CP_PLACEABLE.test(world, pos, state)) {
+-                    possibleStructures.or(M_PLACEABLE[uniquePosId]);
++                    BitSetUtils.orIfPresent(possibleStructures, M_PLACEABLE[uniquePosId]);
+                 } else if (ComparablePredicate.CP_SOLID_BLOCK.test(world, pos, state)) {
+-                    possibleStructures.or(M_SOLID_BLOCK[uniquePosId]);
++                    BitSetUtils.orIfPresent(possibleStructures, M_SOLID_BLOCK[uniquePosId]);
+                 } else {
+-                    possibleStructures.or(M_OTHER[uniquePosId]);
++                    BitSetUtils.orIfPresent(possibleStructures, M_OTHER[uniquePosId]);
++                }
++            }
++            BitSetUtils.orIfPresent(possibleStructures, M_POWER_TYPE_NOT[powerBlockUsage.ordinal()]);
++            return possibleStructures;
++        }
++
++        public static @NotNull Stream<BlockBreakStructure> findPossibleStructuresInCache(@NotNull World world, @NotNull BlockPos targetPos) {
++            return findPossibleStructuresInCache(new StructureSearchContext(world, targetPos, false));
++        }
++
++        public static @NotNull Stream<BlockBreakStructure> findPossibleStructuresInCache(@NotNull StructureSearchContext ctx) {
++            return BitSetUtils.streamSetBits(possibleStructures(ctx, PowerBlockType.Both), STRUCTURES.getOriginalObjects());
++        }
++
++        public static @NotNull Stream<BlockBreakStructure> findPossibleStructuresInCache(
++                @NotNull StructureSearchContext ctx,
++                @NotNull PowerBlockType powerBlockUsage,
++                boolean hasDependBlock
++        ) {
++            return StreamSupport.stream(
++                    Spliterators.spliteratorUnknownSize(findPossibleStructuresIterator(ctx, powerBlockUsage, hasDependBlock),
++                            Spliterator.ORDERED | Spliterator.NONNULL),
++                    false);
++        }
++
++        /**
++         * 热路径：直接给迭代器。原来这里是一条 {@code Stream}，两层 {@code .filter()} 的
++         * {@code ReferencePipeline} 机制实测占了单次搜索 ~18%（JFR：{@code ReferencePipeline$2$1.accept}
++         * + {@code WrappingSpliterator.fillBuffer} + {@code IteratorSpliterator.tryAdvance} +
++         * {@code Sink.cancellationRequested}）。换成一个小迭代器之后这些全没了。
++         */
++        public static @NotNull Iterator<BlockBreakStructure> findPossibleStructuresIterator(
++                @NotNull StructureSearchContext ctx,
++                @NotNull PowerBlockType powerBlockUsage,
++                boolean hasDependBlock
++        ) {
++            final long[] bits = possibleStructures(ctx, powerBlockUsage);
++            ctx.applyPistonMask(bits, M_PISTON);
++            return new FilteredIterator(
++                    BitSetUtils.unsetBitIterator(bits, STRUCTURES.getOriginalObjects(), STRUCTURES.size()),
++                    powerBlockUsage, ctx);
++        }
++
++        private static final class FilteredIterator implements Iterator<BlockBreakStructure> {
++            private final Iterator<BlockBreakStructure> delegate;
++            private final PowerBlockType powerBlockUsage;
++            private final StructureSearchContext ctx;
++            private BlockBreakStructure next;
++
++            FilteredIterator(@NotNull Iterator<BlockBreakStructure> delegate,
++                             @NotNull PowerBlockType powerBlockUsage,
++                             @NotNull StructureSearchContext ctx) {
++                this.delegate = delegate;
++                this.powerBlockUsage = powerBlockUsage;
++                this.ctx = ctx;
++                advance();
++            }
++
++            private void advance() {
++                while (delegate.hasNext()) {
++                    final BlockBreakStructure candidate = delegate.next();
++                    if (!candidate.testBeforePlace(ctx))
++                        continue;
++                    next = candidate;
++                    return;
+                 }
++                next = null;
++            }
++
++            @Override
++            public boolean hasNext() {
++                return next != null;
++            }
++
++            @Override
++            public BlockBreakStructure next() {
++                if (next == null)
++                    throw new NoSuchElementException();
++                final BlockBreakStructure value = next;
++                advance();
++                return value;
+             }
+-            possibleStructures.flip(0, STRUCTURES.size()); // TODO
+-            return possibleStructures.stream().mapToObj((id) -> STRUCTURES.getOriginalObjects()[id]);
+         }
+ 
+         public static @NotNull Stream<BlockBreakStructureFull> findPossibleFullStructuresInCache(
+@@ -100,12 +237,9 @@ public final class SimpleBlockFinder {
+                 @NotNull PowerBlockType powerBlockUsage,
+                 boolean hasDependBlock
+         ) {
+-            Stream<BlockBreakStructure> stream = findPossibleStructuresInCache(world, targetPos);
+-            if (powerBlockUsage != PowerBlockType.Both) {
+-                stream = stream.filter(structure -> structure.powerBlockType == powerBlockUsage);
+-            }
+-            return stream
+-                    .filter(structure -> structure.testBeforePlace(world, targetPos, hasDependBlock))
++            // 优化点 S-1 / S-4：一次搜索对应一个世界查询缓存；返回 BlockBreakStructure，只有选中的候选才构造 Full。
++            final StructureSearchContext ctx = new StructureSearchContext(world, targetPos, hasDependBlock);
++            return findPossibleStructuresInCache(ctx, powerBlockUsage, hasDependBlock)
+                     .map(structure -> BlockBreakStructureFull.of(targetPos, structure));
+         }
+ 
