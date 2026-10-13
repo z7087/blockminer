@@ -1,33 +1,29 @@
-# gradle
-
+# Gradle
 .gradle/
 build/
-out/
-classes/
+!gradle/wrapper/gradle-wrapper.jar
 
-# eclipse
+# Loom
+.loom-cache/
+remapped_working/
+run/
 
-*.launch
-
-# idea
-
+# IDEA
 .idea/
 *.iml
 *.ipr
 *.iws
+out/
 
-# vscode
-
-.settings/
-.vscode/
-bin/
+# Eclipse / VSCode
 .classpath
 .project
+.settings/
+.vscode/
 
-# macos
+# OS
+.DS_Store
+Thumbs.db
 
-*.DS_Store
-
-# fabric
-
-run/
+# 本地工具输出
+versions/*/build/
